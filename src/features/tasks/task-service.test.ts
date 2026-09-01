@@ -120,6 +120,24 @@ describe("taskService", () => {
     expect(select.mock.calls[1]?.[1]).toEqual(["2026-09-01"]);
   });
 
+  it("lists upcoming tasks that are scheduled or due in the selected date range", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+
+    const tasks = await taskService.listUpcomingTasks("2026-09-01", "2026-09-07");
+
+    expect(tasks).toHaveLength(1);
+    expect(select.mock.calls[0]?.[0]).toContain("scheduled_date BETWEEN $1 AND $2");
+    expect(select.mock.calls[0]?.[0]).toContain("OR due_date BETWEEN $1 AND $2");
+    expect(select.mock.calls[0]?.[1]).toEqual(["2026-09-01", "2026-09-07"]);
+  });
+
+  it("rejects an invalid upcoming date range before accessing the database", async () => {
+    await expect(taskService.listUpcomingTasks("2026-09-08", "2026-09-01")).rejects.toThrow(
+      "日期范围无效",
+    );
+    expect(getDatabase).not.toHaveBeenCalled();
+  });
+
   it("uses local-day boundaries when listing completed tasks", async () => {
     select.mockResolvedValueOnce([
       { ...taskRow, completed_at: "2026-09-01T01:00:00.000Z", status: "completed" },
