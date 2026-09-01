@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 
 import "./App.css";
 import { getDatabaseHealth } from "./features/database/database";
+import { dailyPlanService } from "./features/daily-plan/daily-plan-service";
 import { projectService, type UpdateProjectInput } from "./features/projects/project-service";
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
@@ -19,6 +20,23 @@ type ReversibleTaskAction = {
   task: Pick<TaskRecord, "id" | "title">;
 };
 
+function toLocalDateValue(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function formatTodayLabel(localDate: string): string {
+  const [year, month, day] = localDate.split("-").map(Number);
+  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(date);
+}
+
 function App() {
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
   const [databaseMessage, setDatabaseMessage] = useState("正在准备本地数据库…");
@@ -27,6 +45,12 @@ function App() {
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
+  const [todayFocusTasks, setTodayFocusTasks] = useState<TaskRecord[]>([]);
+  const [todayScheduledTasks, setTodayScheduledTasks] = useState<TaskRecord[]>([]);
+  const [todayOverdueTasks, setTodayOverdueTasks] = useState<TaskRecord[]>([]);
+  const [todayCompletedTasks, setTodayCompletedTasks] = useState<TaskRecord[]>([]);
+  const [todayCandidateTasks, setTodayCandidateTasks] = useState<TaskRecord[]>([]);
+  const [isCompletedTodayExpanded, setIsCompletedTodayExpanded] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInputValue, setSearchInputValue] = useState("");
@@ -134,6 +158,24 @@ function App() {
     setTasks(activeTasks);
   }
 
+  async function loadTodayTasks() {
+    const today = toLocalDateValue();
+    const [focusTasks, scheduledTasks, overdueTasks, completedTasks, candidateTasks] =
+      await Promise.all([
+        dailyPlanService.listFocusTasks(today),
+        taskService.listActiveTasksScheduledOn(today),
+        taskService.listOverdueActiveTasks(today),
+        taskService.listCompletedTasksOn(today),
+        taskService.listActiveTasks(),
+      ]);
+
+    setTodayFocusTasks(focusTasks);
+    setTodayScheduledTasks(scheduledTasks);
+    setTodayOverdueTasks(overdueTasks);
+    setTodayCompletedTasks(completedTasks);
+    setTodayCandidateTasks(candidateTasks);
+  }
+
   function closeQuickAdd() {
     if (isSavingTask) return;
     setIsQuickAddOpen(false);
@@ -179,6 +221,7 @@ function App() {
       await taskService.completeTask(task.id);
       setTasks((currentTasks) => currentTasks.filter((currentTask) => currentTask.id !== task.id));
       setLastTaskAction({ kind: "completed", task: { id: task.id, title: task.title } });
+      if (activeView === "今日") await loadTodayTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新任务失败，请重试。");
     }
@@ -269,6 +312,7 @@ function App() {
         currentTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
       );
       setSelectedTask(null);
+      if (activeView === "今日") await loadTodayTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "保存任务失败，请重试。");
     } finally {
@@ -384,6 +428,7 @@ function App() {
       setLastTaskAction({ kind: "trashed", task: { id: task.id, title: task.title } });
       setSelectedTask(null);
       setPendingTaskDeletion(null);
+      if (activeView === "今日") await loadTodayTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "删除任务失败，请重试。");
     }
@@ -398,6 +443,7 @@ function App() {
         currentTasks.filter((currentTask) => currentTask.id !== task.id),
       );
       if (activeView === "收集箱") await loadInboxTasks();
+      if (activeView === "今日") await loadTodayTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "恢复任务失败，请重试。");
     }
@@ -437,9 +483,32 @@ function App() {
 
     try {
       if (item === "收集箱") await loadInboxTasks();
+      if (item === "今日") await loadTodayTasks();
       if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
+    }
+  }
+
+  async function handleAddFocusTask(task: TaskRecord) {
+    setTaskError(null);
+
+    try {
+      await dailyPlanService.addFocusTask(task.id, toLocalDateValue());
+      await loadTodayTasks();
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "设置今日重点失败，请重试。");
+    }
+  }
+
+  async function handleRemoveFocusTask(task: TaskRecord) {
+    setTaskError(null);
+
+    try {
+      await dailyPlanService.removeFocusTask(task.id, toLocalDateValue());
+      await loadTodayTasks();
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "移出今日重点失败，请重试。");
     }
   }
 
@@ -527,6 +596,7 @@ function App() {
     }
   }
 
+  const isToday = activeView === "今日";
   const isInbox = activeView === "收集箱";
   const isProjects = activeView === "项目";
   const isTags = activeView === "标签";
@@ -536,6 +606,15 @@ function App() {
   );
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
+  const todayFocusTaskIds = new Set(todayFocusTasks.map((task) => task.id));
+  const todayOtherTaskIds = new Set([
+    ...todayScheduledTasks.map((task) => task.id),
+    ...todayOverdueTasks.map((task) => task.id),
+  ]);
+  const todayCandidates = todayCandidateTasks.filter(
+    (task) => !todayFocusTaskIds.has(task.id) && !todayOtherTaskIds.has(task.id),
+  );
+  const todayLabel = formatTodayLabel(toLocalDateValue());
 
   async function handleMoveProject(projectId: string, direction: -1 | 1) {
     const currentIndex = activeProjects.findIndex((project) => project.id === projectId);
@@ -610,7 +689,7 @@ function App() {
         <header className="workspace-header">
           <div>
             <p className="eyebrow">{activeView}</p>
-            <h1>{isInbox ? "先记下，稍后再安排" : activeView}</h1>
+            <h1>{isToday ? "今天，专注少数要事" : isInbox ? "先记下，稍后再安排" : activeView}</h1>
           </div>
           <button
             aria-keyshortcuts="Control+N Meta+N"
@@ -623,7 +702,228 @@ function App() {
           </button>
         </header>
 
-        {isInbox && tasks.length === 0 && !hasInboxFilters ? (
+        {isToday ? (
+          <section aria-labelledby="today-view-title" className="today-view">
+            <div className="today-intro">
+              <div>
+                <h2 id="today-view-title">{todayLabel}</h2>
+                <p>先确定最重要的几件事，再处理已经安排和逾期的任务。</p>
+              </div>
+              <span className="today-count">{todayFocusTasks.length}/3 个重点</span>
+            </div>
+
+            <section aria-labelledby="today-focus-title" className="today-section is-focus">
+              <div className="today-section-header">
+                <div>
+                  <p className="eyebrow">今日重点</p>
+                  <h3 id="today-focus-title">留出空间给真正重要的事</h3>
+                </div>
+                {todayFocusTasks.length > 3 ? (
+                  <span className="today-over-limit">已超过建议的 3 条</span>
+                ) : null}
+              </div>
+              {todayFocusTasks.length > 0 ? (
+                <ul className="today-task-list">
+                  {todayFocusTasks.map((task) => (
+                    <li className="today-task-row" key={task.id}>
+                      <button
+                        aria-label={`完成任务：${task.title}`}
+                        className="task-complete-button"
+                        onClick={() => void handleCompleteTask(task)}
+                        type="button"
+                      />
+                      <button
+                        className="task-title"
+                        onClick={() => void openTaskDetails(task)}
+                        type="button"
+                      >
+                        {task.title}
+                      </button>
+                      {task.scheduledDate ? <span className="today-date-chip">已计划</span> : null}
+                      <button
+                        aria-label={`移出今日重点：${task.title}`}
+                        className="today-action-button"
+                        onClick={() => void handleRemoveFocusTask(task)}
+                        type="button"
+                      >
+                        移出
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="today-empty">从下方任务中挑选今天最值得推进的 1 到 3 件事。</p>
+              )}
+            </section>
+
+            {todayOverdueTasks.filter((task) => !todayFocusTaskIds.has(task.id)).length > 0 ? (
+              <section aria-labelledby="today-overdue-title" className="today-section is-overdue">
+                <div className="today-section-header">
+                  <div>
+                    <p className="eyebrow">需要留意</p>
+                    <h3 id="today-overdue-title">逾期</h3>
+                  </div>
+                  <span className="today-section-count">
+                    {todayOverdueTasks.filter((task) => !todayFocusTaskIds.has(task.id)).length}
+                  </span>
+                </div>
+                <ul className="today-task-list">
+                  {todayOverdueTasks
+                    .filter((task) => !todayFocusTaskIds.has(task.id))
+                    .map((task) => (
+                      <li className="today-task-row" key={task.id}>
+                        <button
+                          aria-label={`完成任务：${task.title}`}
+                          className="task-complete-button"
+                          onClick={() => void handleCompleteTask(task)}
+                          type="button"
+                        />
+                        <button
+                          className="task-title"
+                          onClick={() => void openTaskDetails(task)}
+                          type="button"
+                        >
+                          {task.title}
+                        </button>
+                        <span className="today-date-chip is-overdue">截止 {task.dueDate}</span>
+                        <button
+                          className="today-action-button"
+                          onClick={() => void handleAddFocusTask(task)}
+                          type="button"
+                        >
+                          设为重点
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <section aria-labelledby="today-scheduled-title" className="today-section">
+              <div className="today-section-header">
+                <div>
+                  <p className="eyebrow">今日安排</p>
+                  <h3 id="today-scheduled-title">已计划</h3>
+                </div>
+                <span className="today-section-count">
+                  {todayScheduledTasks.filter((task) => !todayFocusTaskIds.has(task.id)).length}
+                </span>
+              </div>
+              {todayScheduledTasks.filter((task) => !todayFocusTaskIds.has(task.id)).length > 0 ? (
+                <ul className="today-task-list">
+                  {todayScheduledTasks
+                    .filter((task) => !todayFocusTaskIds.has(task.id))
+                    .map((task) => (
+                      <li className="today-task-row" key={task.id}>
+                        <button
+                          aria-label={`完成任务：${task.title}`}
+                          className="task-complete-button"
+                          onClick={() => void handleCompleteTask(task)}
+                          type="button"
+                        />
+                        <button
+                          className="task-title"
+                          onClick={() => void openTaskDetails(task)}
+                          type="button"
+                        >
+                          {task.title}
+                        </button>
+                        {task.scheduledStartAt ? (
+                          <span className="today-date-chip">有时间安排</span>
+                        ) : null}
+                        <button
+                          className="today-action-button"
+                          onClick={() => void handleAddFocusTask(task)}
+                          type="button"
+                        >
+                          设为重点
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="today-empty">还没有安排到今天的任务。</p>
+              )}
+            </section>
+
+            {todayCandidates.length > 0 ? (
+              <section
+                aria-labelledby="today-candidates-title"
+                className="today-section is-candidates"
+              >
+                <div className="today-section-header">
+                  <div>
+                    <p className="eyebrow">可选任务</p>
+                    <h3 id="today-candidates-title">从收集箱里挑选</h3>
+                  </div>
+                </div>
+                <ul className="today-task-list">
+                  {todayCandidates.slice(0, 8).map((task) => (
+                    <li className="today-task-row" key={task.id}>
+                      <button
+                        className="task-title"
+                        onClick={() => void openTaskDetails(task)}
+                        type="button"
+                      >
+                        {task.title}
+                      </button>
+                      <button
+                        className="today-action-button"
+                        onClick={() => void handleAddFocusTask(task)}
+                        type="button"
+                      >
+                        设为重点
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {todayCandidates.length > 8 ? (
+                  <p className="today-more">还有 {todayCandidates.length - 8} 条任务可选</p>
+                ) : null}
+              </section>
+            ) : null}
+
+            {todayCompletedTasks.length > 0 ? (
+              <section
+                aria-labelledby="today-completed-title"
+                className="today-section is-completed"
+              >
+                <button
+                  aria-expanded={isCompletedTodayExpanded}
+                  className="today-collapse-button"
+                  onClick={() => setIsCompletedTodayExpanded((current) => !current)}
+                  type="button"
+                >
+                  <span>
+                    <span className="eyebrow">今日进度</span>
+                    <strong id="today-completed-title">
+                      已完成 {todayCompletedTasks.length} 项
+                    </strong>
+                  </span>
+                  <span aria-hidden="true">{isCompletedTodayExpanded ? "⌃" : "⌄"}</span>
+                </button>
+                {isCompletedTodayExpanded ? (
+                  <ul className="today-task-list is-completed">
+                    {todayCompletedTasks.map((task) => (
+                      <li className="today-task-row" key={task.id}>
+                        <span aria-hidden="true" className="completed-check">
+                          ✓
+                        </span>
+                        <button
+                          className="task-title"
+                          onClick={() => void openTaskDetails(task)}
+                          type="button"
+                        >
+                          {task.title}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
+          </section>
+        ) : isInbox && tasks.length === 0 && !hasInboxFilters ? (
           <section className="empty-state" aria-labelledby="empty-state-title">
             <span className="empty-state-icon" aria-hidden="true">
               ✓

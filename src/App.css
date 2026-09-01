@@ -482,6 +482,188 @@ h1 {
   color: var(--danger);
 }
 
+.today-view {
+  display: grid;
+  width: min(100%, 860px);
+  gap: 15px;
+}
+.today-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 4px 4px 11px;
+}
+.today-intro h2 {
+  margin-bottom: 6px;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+.today-intro p,
+.today-empty,
+.today-more {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.today-count,
+.today-section-count,
+.today-over-limit,
+.today-date-chip {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.today-count {
+  border: 1px solid #bddac9;
+  background: #e8f4ec;
+  color: var(--accent-deep);
+}
+.today-section {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgb(255 254 250 / 86%);
+  box-shadow: 0 8px 28px rgb(35 53 44 / 5%);
+}
+.today-section.is-focus {
+  border-color: #b8d9c5;
+  background: linear-gradient(135deg, rgb(235 247 238 / 98%), rgb(255 254 250 / 94%));
+}
+.today-section.is-overdue {
+  border-color: #efd0c8;
+}
+.today-section.is-candidates,
+.today-section.is-completed {
+  background: rgb(248 250 247 / 82%);
+}
+.today-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 20px 14px;
+}
+.today-section-header .eyebrow {
+  margin-bottom: 5px;
+  font-size: 10px;
+}
+.today-section-header h3 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.today-section-count {
+  min-width: 25px;
+  background: var(--panel-soft);
+  color: var(--faint);
+  text-align: center;
+}
+.today-over-limit {
+  border: 1px solid #ebc09d;
+  background: #fff3e6;
+  color: #a66022;
+}
+.today-task-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today-task-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 52px;
+  border-top: 1px solid rgb(220 228 221 / 85%);
+  padding: 9px 15px 9px 20px;
+  transition: background 0.15s ease;
+}
+.today-task-row:hover {
+  background: rgb(240 247 242 / 72%);
+}
+.today-task-row .task-title {
+  flex: 1;
+}
+.today-empty {
+  border-top: 1px solid rgb(220 228 221 / 85%);
+  padding: 17px 20px 19px;
+}
+.today-action-button {
+  flex: 0 0 auto;
+  border: 1px solid #cbd8cf;
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 730;
+}
+.today-action-button:hover {
+  border-color: #9ccbb4;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+.today-date-chip {
+  background: var(--panel-soft);
+  color: var(--faint);
+}
+.today-date-chip.is-overdue {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.today-more {
+  border-top: 1px solid rgb(220 228 221 / 85%);
+  padding: 11px 20px;
+}
+.today-collapse-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  padding: 16px 20px;
+  color: var(--ink);
+  text-align: left;
+}
+.today-collapse-button:hover {
+  background: rgb(240 247 242 / 72%);
+}
+.today-collapse-button .eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+.today-collapse-button strong {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+.today-task-list.is-completed .task-title {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.completed-check {
+  display: grid;
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .project-list li {
   min-height: 68px;
   border-bottom: 1px solid var(--line);

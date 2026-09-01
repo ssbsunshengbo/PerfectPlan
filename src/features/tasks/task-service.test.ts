@@ -108,6 +108,31 @@ describe("taskService", () => {
     expect(select.mock.calls[0]?.[1]).toEqual(["tag-1"]);
   });
 
+  it("lists scheduled and overdue active root tasks for a local date", async () => {
+    select.mockResolvedValueOnce([taskRow]).mockResolvedValueOnce([taskRow]);
+
+    await taskService.listActiveTasksScheduledOn("2026-09-01");
+    await taskService.listOverdueActiveTasks("2026-09-01");
+
+    expect(select.mock.calls[0]?.[0]).toContain("scheduled_date = $1");
+    expect(select.mock.calls[0]?.[1]).toEqual(["2026-09-01"]);
+    expect(select.mock.calls[1]?.[0]).toContain("due_date < $1");
+    expect(select.mock.calls[1]?.[1]).toEqual(["2026-09-01"]);
+  });
+
+  it("uses local-day boundaries when listing completed tasks", async () => {
+    select.mockResolvedValueOnce([
+      { ...taskRow, completed_at: "2026-09-01T01:00:00.000Z", status: "completed" },
+    ]);
+
+    const tasks = await taskService.listCompletedTasksOn("2026-09-01");
+
+    expect(tasks).toHaveLength(1);
+    expect(select.mock.calls[0]?.[0]).toContain("completed_at >= $1");
+    expect(select.mock.calls[0]?.[0]).toContain("completed_at < $2");
+    expect(select.mock.calls[0]?.[1]).toHaveLength(2);
+  });
+
   it("searches task titles and notes with project, priority and tag filters", async () => {
     select.mockResolvedValueOnce([taskRow]);
 

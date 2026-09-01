@@ -94,6 +94,17 @@ function normalizeLocalDate(value: string | null | undefined, fieldName: string)
   return normalizedValue;
 }
 
+function localDateBounds(value: string): [string, string] {
+  const normalizedDate = normalizeLocalDate(value, "日期");
+  if (!normalizedDate) throw new Error("日期不能为空");
+
+  const [year, month, day] = normalizedDate.split("-").map(Number);
+  const start = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+  const nextDay = new Date(year ?? 0, (month ?? 1) - 1, (day ?? 1) + 1);
+
+  return [start.toISOString(), nextDay.toISOString()];
+}
+
 function normalizeScheduledStartAt(value: string | null | undefined): string | null {
   const normalizedValue = value?.trim() ?? "";
 
@@ -205,6 +216,52 @@ export const taskService = {
        FROM tasks
        WHERE status = 'active' AND parent_task_id IS NULL
        ORDER BY sort_order ASC, created_at DESC`,
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async listActiveTasksScheduledOn(localDate: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status = 'active' AND parent_task_id IS NULL AND scheduled_date = $1
+       ORDER BY priority DESC, sort_order ASC, created_at DESC`,
+      [normalizeLocalDate(localDate, "计划日期")],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async listOverdueActiveTasks(localDate: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status = 'active'
+         AND parent_task_id IS NULL
+         AND due_date IS NOT NULL
+         AND due_date < $1
+       ORDER BY due_date ASC, priority DESC, sort_order ASC`,
+      [normalizeLocalDate(localDate, "日期")],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async listCompletedTasksOn(localDate: string): Promise<TaskRecord[]> {
+    const [startAt, endAt] = localDateBounds(localDate);
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status = 'completed'
+         AND parent_task_id IS NULL
+         AND completed_at >= $1
+         AND completed_at < $2
+       ORDER BY completed_at DESC`,
+      [startAt, endAt],
     );
 
     return rows.map(toTaskRecord);
