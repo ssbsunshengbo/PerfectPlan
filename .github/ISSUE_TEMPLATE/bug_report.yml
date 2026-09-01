@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible problem in PerfectPlan.
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for helping improve PerfectPlan. Please do not include private task content.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the actual result and the expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Create …
+        3. Observe …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: PerfectPlan version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true

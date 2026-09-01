@@ -1,0 +1,5 @@
+dist/
+node_modules/
+.pnpm-store/
+src-tauri/gen/
+src-tauri/target/
