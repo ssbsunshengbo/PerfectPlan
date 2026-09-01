@@ -78,10 +78,15 @@ function App() {
         setTags(availableTags);
         setDatabaseState("ready");
         setDatabaseMessage("本地数据库已准备完成");
-      } catch {
+      } catch (error) {
+        console.error("Unable to initialize the local database", error);
         if (!isMounted) return;
         setDatabaseState("error");
-        setDatabaseMessage("无法打开本地数据库。请检查磁盘空间后重试。");
+        setDatabaseMessage(
+          error instanceof Error
+            ? `无法打开本地数据库：${error.message}`
+            : "无法打开本地数据库。请检查磁盘空间后重试。",
+        );
       }
     })();
 
