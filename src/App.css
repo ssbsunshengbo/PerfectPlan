@@ -669,6 +669,14 @@ h1 {
   margin: 14px 0;
 }
 
+.tag-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid #edf1f5;
+  padding: 12px 22px;
+}
+
 .tag-chip {
   border: 1px solid #d7dfe7;
   border-radius: 999px;
@@ -689,6 +697,19 @@ h1 {
   background: #e9edff;
   color: #304ccf;
   font-weight: 700;
+}
+
+.tag-color {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #8193fa;
+}
+
+.danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .subtask-heading {

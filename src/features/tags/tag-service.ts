@@ -108,4 +108,9 @@ export const tagService = {
       tagId,
     ]);
   },
+
+  async deleteTag(tagId: string): Promise<void> {
+    const database = await getDatabase();
+    await database.execute(`DELETE FROM tags WHERE id = $1`, [tagId]);
+  },
 };

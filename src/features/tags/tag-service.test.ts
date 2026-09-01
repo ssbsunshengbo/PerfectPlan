@@ -40,6 +40,12 @@ describe("tagService", () => {
     expect(execute.mock.calls[0]?.[0]).toContain("INSERT OR IGNORE");
   });
 
+  it("deletes a tag record without touching its tasks", async () => {
+    await tagService.deleteTag("tag-1");
+
+    expect(execute).toHaveBeenCalledWith("DELETE FROM tags WHERE id = $1", ["tag-1"]);
+  });
+
   it("rejects an empty tag name", () => {
     expect(() => normalizeTagName("  ")).toThrow("标签名称不能为空");
   });

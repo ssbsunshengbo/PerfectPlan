@@ -199,6 +199,26 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
+  async listActiveTasksByTag(tagId: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT
+         tasks.id, tasks.title, tasks.notes, tasks.status, tasks.priority, tasks.project_id,
+         tasks.parent_task_id, tasks.scheduled_date, tasks.scheduled_start_at,
+         tasks.estimated_minutes, tasks.due_date, tasks.completed_at, tasks.deleted_at,
+         tasks.sort_order, tasks.created_at, tasks.updated_at
+       FROM tasks
+       INNER JOIN task_tags ON task_tags.task_id = tasks.id
+       WHERE tasks.status = 'active'
+         AND tasks.parent_task_id IS NULL
+         AND task_tags.tag_id = $1
+       ORDER BY tasks.sort_order ASC, tasks.created_at DESC`,
+      [tagId],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
   async listActiveSubtasks(parentTaskId: string): Promise<TaskRecord[]> {
     const database = await getDatabase();
     const rows = await database.select<TaskRow[]>(

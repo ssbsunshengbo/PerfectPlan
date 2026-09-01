@@ -12,7 +12,7 @@ import type { TaskRecord } from "./features/tasks/task-types";
 
 type DatabaseState = "loading" | "ready" | "error";
 
-const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项目"] as const;
+const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项目", "标签"] as const;
 type NavigationItem = (typeof navigationItems)[number];
 
 function App() {
@@ -22,6 +22,7 @@ function App() {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
@@ -82,6 +83,13 @@ function App() {
     };
   }, []);
 
+  async function loadInboxTasks(tagId = activeTagId) {
+    const activeTasks = tagId
+      ? await taskService.listActiveTasksByTag(tagId)
+      : await taskService.listActiveTasks();
+    setTasks(activeTasks);
+  }
+
   function closeQuickAdd() {
     if (isSavingTask) return;
     setIsQuickAddOpen(false);
@@ -96,7 +104,9 @@ function App() {
 
     try {
       const task = await taskService.createTask({ title: newTaskTitle });
-      setTasks((currentTasks) => [task, ...currentTasks]);
+      if (!activeTagId) {
+        setTasks((currentTasks) => [task, ...currentTasks]);
+      }
       setLastCreatedTask({ id: task.id, title: task.title });
       setNewTaskTitle("");
     } catch (error) {
@@ -270,6 +280,7 @@ function App() {
       await tagService.attachTagToTask(selectedTask.id, tag.id);
       setTags((currentTags) => [...currentTags, tag]);
       setTaskTags((currentTags) => [...currentTags, tag]);
+      if (activeTagId === tag.id) await loadInboxTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "创建标签失败，请重试。");
     } finally {
@@ -294,6 +305,7 @@ function App() {
         const tag = tags.find((currentTag) => currentTag.id === tagId);
         if (tag) setTaskTags((currentTags) => [...currentTags, tag]);
       }
+      if (activeTagId === tagId) await loadInboxTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新标签失败，请重试。");
     } finally {
@@ -318,8 +330,45 @@ function App() {
     }
   }
 
+  async function handleTagFilter(tagId: string | null) {
+    setTaskError(null);
+    setActiveTagId(tagId);
+
+    try {
+      await loadInboxTasks(tagId);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "筛选标签失败，请重试。");
+    }
+  }
+
+  async function handleDeleteTag(tag: TagRecord) {
+    const shouldDelete = window.confirm(
+      `删除标签「${tag.name}」？任务会保留，只会解除与该标签的关联。`,
+    );
+    if (!shouldDelete) return;
+
+    setTaskError(null);
+    setIsSavingTag(true);
+
+    try {
+      await tagService.deleteTag(tag.id);
+      setTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
+      setTaskTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
+
+      if (activeTagId === tag.id) {
+        setActiveTagId(null);
+        await loadInboxTasks(null);
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "删除标签失败，请重试。");
+    } finally {
+      setIsSavingTag(false);
+    }
+  }
+
   const isInbox = activeView === "收集箱";
   const isProjects = activeView === "项目";
+  const isTags = activeView === "标签";
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
 
@@ -400,7 +449,7 @@ function App() {
           </button>
         </header>
 
-        {isInbox && tasks.length === 0 ? (
+        {isInbox && tasks.length === 0 && !activeTagId ? (
           <section className="empty-state" aria-labelledby="empty-state-title">
             <span className="empty-state-icon" aria-hidden="true">
               ✓
@@ -416,25 +465,50 @@ function App() {
                 <p>{tasks.length} 条任务保存在此设备</p>
               </div>
             </div>
-            <ul>
-              {tasks.map((task) => (
-                <li className="task-row" key={task.id}>
+            {tags.length > 0 ? (
+              <div aria-label="按标签筛选" className="tag-filter-bar">
+                <button
+                  className={!activeTagId ? "tag-chip is-selected" : "tag-chip"}
+                  onClick={() => void handleTagFilter(null)}
+                  type="button"
+                >
+                  全部
+                </button>
+                {tags.map((tag) => (
                   <button
-                    aria-label={`完成任务：${task.title}`}
-                    className="task-complete-button"
-                    onClick={() => void handleCompleteTask(task.id)}
-                    type="button"
-                  />
-                  <button
-                    className="task-title"
-                    onClick={() => void openTaskDetails(task)}
+                    className={activeTagId === tag.id ? "tag-chip is-selected" : "tag-chip"}
+                    key={tag.id}
+                    onClick={() => void handleTagFilter(tag.id)}
                     type="button"
                   >
-                    {task.title}
+                    {tag.name}
                   </button>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </div>
+            ) : null}
+            {tasks.length > 0 ? (
+              <ul>
+                {tasks.map((task) => (
+                  <li className="task-row" key={task.id}>
+                    <button
+                      aria-label={`完成任务：${task.title}`}
+                      className="task-complete-button"
+                      onClick={() => void handleCompleteTask(task.id)}
+                      type="button"
+                    />
+                    <button
+                      className="task-title"
+                      onClick={() => void openTaskDetails(task)}
+                      type="button"
+                    >
+                      {task.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="project-empty">这个标签下还没有待完成任务。</p>
+            )}
           </section>
         ) : isProjects ? (
           <section className="project-list" aria-labelledby="project-list-title">
@@ -526,6 +600,38 @@ function App() {
                 </ul>
               </div>
             ) : null}
+          </section>
+        ) : isTags ? (
+          <section className="project-list" aria-labelledby="tag-management-title">
+            <div className="task-list-heading">
+              <div>
+                <h2 id="tag-management-title">标签</h2>
+                <p>跨项目整理任务；标签可在任务详情中创建。</p>
+              </div>
+            </div>
+            {tags.length > 0 ? (
+              <ul>
+                {tags.map((tag) => (
+                  <li className="project-row" key={tag.id}>
+                    <span aria-hidden="true" className="tag-color" />
+                    <div className="project-summary">
+                      <strong>{tag.name}</strong>
+                      <span>删除后只会解除任务关联，不会删除任务</span>
+                    </div>
+                    <button
+                      className="danger-button"
+                      disabled={isSavingTag}
+                      onClick={() => void handleDeleteTag(tag)}
+                      type="button"
+                    >
+                      删除
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="project-empty">还没有标签。可在任务详情中创建并添加标签。</p>
+            )}
           </section>
         ) : (
           <section className="empty-state" aria-labelledby="future-view-title">

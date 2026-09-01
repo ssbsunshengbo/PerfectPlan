@@ -78,6 +78,16 @@ describe("taskService", () => {
     expect(execute.mock.calls[0]?.[1]?.[0]).toBe("trashed");
   });
 
+  it("lists active root tasks associated with a tag", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+
+    const tasks = await taskService.listActiveTasksByTag("tag-1");
+
+    expect(tasks).toHaveLength(1);
+    expect(select.mock.calls[0]?.[0]).toContain("INNER JOIN task_tags");
+    expect(select.mock.calls[0]?.[1]).toEqual(["tag-1"]);
+  });
+
   it("updates task notes, priority and scheduling fields together", async () => {
     const updatedRow = {
       ...taskRow,
