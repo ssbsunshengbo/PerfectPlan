@@ -54,6 +54,74 @@ function parseDateValue(value: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+type SelectOption = {
+  disabled?: boolean;
+  label: string;
+  value: string | number;
+};
+
+function SelectField({
+  disabled,
+  id,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  disabled: boolean;
+  id: string;
+  label: string;
+  onChange: (value: string | number) => void;
+  options: SelectOption[];
+  value: string | number;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find((option) => option.value === value) ?? options[0];
+
+  return (
+    <div className="select-field">
+      <span id={`${id}-label`}>{label}</span>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-labelledby={`${id}-label`}
+        className="select-trigger"
+        disabled={disabled}
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>{selectedOption?.label}</span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+      {isOpen ? (
+        <div aria-label={label} className="select-popover" role="listbox">
+          {options.map((option) => {
+            const isSelected = option.value === value;
+
+            return (
+              <button
+                aria-selected={isSelected}
+                className={isSelected ? "is-selected" : ""}
+                disabled={option.disabled}
+                key={String(option.value)}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                <span>{option.label}</span>
+                {isSelected ? <span aria-hidden="true">✓</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function DatePickerField({
   disabled,
   id,
@@ -314,48 +382,33 @@ export function TaskDetailDialog({
           />
 
           <div className="detail-field-grid">
-            <label htmlFor="task-detail-project">
-              项目
-              <select
-                disabled={isSaving}
-                id="task-detail-project"
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, projectId: event.target.value }))
-                }
-                value={draft.projectId}
-              >
-                <option value="">收集箱</option>
-                {projects.map((project) => (
-                  <option
-                    disabled={project.status === "archived" && project.id !== draft.projectId}
-                    key={project.id}
-                    value={project.id}
-                  >
-                    {project.status === "archived" ? `${project.name}（已归档）` : project.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label htmlFor="task-detail-priority">
-              优先级
-              <select
-                disabled={isSaving}
-                id="task-detail-priority"
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    priority: Number(event.target.value) as TaskPriority,
-                  }))
-                }
-                value={draft.priority}
-              >
-                {priorityOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectField
+              disabled={isSaving}
+              id="task-detail-project"
+              label="项目"
+              onChange={(projectId) =>
+                setDraft((current) => ({ ...current, projectId: String(projectId) }))
+              }
+              options={[
+                { label: "收集箱", value: "" },
+                ...projects.map((project) => ({
+                  disabled: project.status === "archived" && project.id !== draft.projectId,
+                  label: project.status === "archived" ? `${project.name}（已归档）` : project.name,
+                  value: project.id,
+                })),
+              ]}
+              value={draft.projectId}
+            />
+            <SelectField
+              disabled={isSaving}
+              id="task-detail-priority"
+              label="优先级"
+              onChange={(priority) =>
+                setDraft((current) => ({ ...current, priority: Number(priority) as TaskPriority }))
+              }
+              options={priorityOptions}
+              value={draft.priority}
+            />
             <label htmlFor="task-detail-estimate">
               预计时长（分钟）
               <input
