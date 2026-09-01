@@ -45,6 +45,13 @@ export type UpdateTaskInput = {
   dueDate?: string | null;
 };
 
+export type TaskSearchFilters = {
+  projectId?: string | null;
+  priority?: TaskPriority;
+  query?: string;
+  tagId?: string;
+};
+
 export class TaskNotFoundError extends Error {
   constructor(taskId: string) {
     super(`找不到任务：${taskId}`);
@@ -66,6 +73,10 @@ export function normalizeTaskTitle(title: string): string {
   }
 
   return normalizedTitle;
+}
+
+function escapeLikeQuery(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
 function now(): string {
@@ -214,6 +225,44 @@ export const taskService = {
          AND task_tags.tag_id = $1
        ORDER BY tasks.sort_order ASC, tasks.created_at DESC`,
       [tagId],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async searchActiveTasks(filters: TaskSearchFilters = {}): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const clauses = ["status = 'active'", "parent_task_id IS NULL"];
+    const values: Array<string | number | null> = [];
+
+    if (filters.query?.trim()) {
+      values.push(`%${escapeLikeQuery(filters.query.trim())}%`);
+      const placeholder = `$${values.length}`;
+      clauses.push(
+        `(title LIKE ${placeholder} ESCAPE '\\' OR notes LIKE ${placeholder} ESCAPE '\\')`,
+      );
+    }
+    if (filters.projectId !== undefined) {
+      values.push(filters.projectId);
+      clauses.push(`project_id IS $${values.length}`);
+    }
+    if (filters.priority !== undefined) {
+      values.push(filters.priority);
+      clauses.push(`priority = $${values.length}`);
+    }
+    if (filters.tagId) {
+      values.push(filters.tagId);
+      clauses.push(
+        `EXISTS (SELECT 1 FROM task_tags WHERE task_tags.task_id = tasks.id AND task_tags.tag_id = $${values.length})`,
+      );
+    }
+
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE ${clauses.join(" AND ")}
+       ORDER BY sort_order ASC, created_at DESC`,
+      values,
     );
 
     return rows.map(toTaskRecord);

@@ -8,7 +8,7 @@ import { tagService } from "./features/tags/tag-service";
 import type { TagRecord } from "./features/tags/tag-types";
 import { TaskDetailDialog } from "./features/tasks/task-detail-dialog";
 import { taskService, type UpdateTaskInput } from "./features/tasks/task-service";
-import type { TaskRecord } from "./features/tasks/task-types";
+import type { TaskPriority, TaskRecord } from "./features/tasks/task-types";
 
 type DatabaseState = "loading" | "ready" | "error";
 
@@ -28,6 +28,9 @@ function App() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
@@ -86,10 +89,18 @@ function App() {
     };
   }, []);
 
-  async function loadInboxTasks(tagId = activeTagId) {
-    const activeTasks = tagId
-      ? await taskService.listActiveTasksByTag(tagId)
-      : await taskService.listActiveTasks();
+  async function loadInboxTasks(
+    tagId = activeTagId,
+    query = searchQuery,
+    selectedProjectId = projectFilter,
+    selectedPriority = priorityFilter,
+  ) {
+    const activeTasks = await taskService.searchActiveTasks({
+      priority: selectedPriority === "all" ? undefined : selectedPriority,
+      projectId: selectedProjectId === "all" ? undefined : selectedProjectId || null,
+      query,
+      tagId: tagId ?? undefined,
+    });
     setTasks(activeTasks);
   }
 
@@ -107,8 +118,10 @@ function App() {
 
     try {
       const task = await taskService.createTask({ title: newTaskTitle });
-      if (!activeTagId) {
+      if (!activeTagId && !searchQuery && projectFilter === "all" && priorityFilter === "all") {
         setTasks((currentTasks) => [task, ...currentTasks]);
+      } else {
+        await loadInboxTasks();
       }
       setLastTaskAction({ kind: "created", task: { id: task.id, title: task.title } });
       setNewTaskTitle("");
@@ -408,6 +421,53 @@ function App() {
     }
   }
 
+  async function handleSearchQueryChange(query: string) {
+    setSearchQuery(query);
+    setTaskError(null);
+
+    try {
+      await loadInboxTasks(activeTagId, query);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "搜索任务失败，请重试。");
+    }
+  }
+
+  async function handleProjectFilterChange(nextProjectFilter: string) {
+    setProjectFilter(nextProjectFilter);
+    setTaskError(null);
+
+    try {
+      await loadInboxTasks(activeTagId, searchQuery, nextProjectFilter);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "筛选任务失败，请重试。");
+    }
+  }
+
+  async function handlePriorityFilterChange(nextPriorityFilter: "all" | TaskPriority) {
+    setPriorityFilter(nextPriorityFilter);
+    setTaskError(null);
+
+    try {
+      await loadInboxTasks(activeTagId, searchQuery, projectFilter, nextPriorityFilter);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "筛选任务失败，请重试。");
+    }
+  }
+
+  async function handleClearInboxFilters() {
+    setActiveTagId(null);
+    setSearchQuery("");
+    setProjectFilter("all");
+    setPriorityFilter("all");
+    setTaskError(null);
+
+    try {
+      await loadInboxTasks(null, "", "all", "all");
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "清除筛选失败，请重试。");
+    }
+  }
+
   async function handleDeleteTag(tag: TagRecord) {
     const shouldDelete = window.confirm(
       `删除标签「${tag.name}」？任务会保留，只会解除与该标签的关联。`,
@@ -437,6 +497,9 @@ function App() {
   const isProjects = activeView === "项目";
   const isTags = activeView === "标签";
   const isTrash = activeView === "回收站";
+  const hasInboxFilters = Boolean(
+    activeTagId || searchQuery || projectFilter !== "all" || priorityFilter !== "all",
+  );
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
 
@@ -517,7 +580,7 @@ function App() {
           </button>
         </header>
 
-        {isInbox && tasks.length === 0 && !activeTagId ? (
+        {isInbox && tasks.length === 0 && !hasInboxFilters ? (
           <section className="empty-state" aria-labelledby="empty-state-title">
             <span className="empty-state-icon" aria-hidden="true">
               ✓
@@ -530,8 +593,69 @@ function App() {
             <div className="task-list-heading">
               <div>
                 <h2 id="task-list-title">待完成</h2>
-                <p>{tasks.length} 条任务保存在此设备</p>
+                <p>
+                  {hasInboxFilters
+                    ? `找到 ${tasks.length} 条任务`
+                    : `${tasks.length} 条任务保存在此设备`}
+                </p>
               </div>
+            </div>
+            <div className="task-filter-controls">
+              <label className="search-field" htmlFor="task-search">
+                <span>搜索任务</span>
+                <input
+                  id="task-search"
+                  onChange={(event) => void handleSearchQueryChange(event.target.value)}
+                  placeholder="搜索标题和备注"
+                  type="search"
+                  value={searchQuery}
+                />
+              </label>
+              <label className="compact-filter" htmlFor="project-filter">
+                <span>项目</span>
+                <select
+                  id="project-filter"
+                  onChange={(event) => void handleProjectFilterChange(event.target.value)}
+                  value={projectFilter}
+                >
+                  <option value="all">全部项目</option>
+                  <option value="">收集箱</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.status === "archived" ? `${project.name}（已归档）` : project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="compact-filter" htmlFor="priority-filter">
+                <span>优先级</span>
+                <select
+                  id="priority-filter"
+                  onChange={(event) =>
+                    void handlePriorityFilterChange(
+                      event.target.value === "all"
+                        ? "all"
+                        : (Number(event.target.value) as TaskPriority),
+                    )
+                  }
+                  value={priorityFilter}
+                >
+                  <option value="all">全部优先级</option>
+                  <option value="0">无优先级</option>
+                  <option value="1">低优先级</option>
+                  <option value="2">中优先级</option>
+                  <option value="3">高优先级</option>
+                </select>
+              </label>
+              {hasInboxFilters ? (
+                <button
+                  className="text-button"
+                  onClick={() => void handleClearInboxFilters()}
+                  type="button"
+                >
+                  清除筛选
+                </button>
+              ) : null}
             </div>
             {tags.length > 0 ? (
               <div aria-label="按标签筛选" className="tag-filter-bar">
@@ -583,7 +707,7 @@ function App() {
                 ))}
               </ul>
             ) : (
-              <p className="project-empty">这个标签下还没有待完成任务。</p>
+              <p className="project-empty">没有匹配当前搜索或筛选条件的待完成任务。</p>
             )}
           </section>
         ) : isProjects ? (

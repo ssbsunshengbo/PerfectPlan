@@ -108,6 +108,24 @@ describe("taskService", () => {
     expect(select.mock.calls[0]?.[1]).toEqual(["tag-1"]);
   });
 
+  it("searches task titles and notes with project, priority and tag filters", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+
+    const tasks = await taskService.searchActiveTasks({
+      priority: 2,
+      projectId: "project-1",
+      query: "计划_2026%",
+      tagId: "tag-1",
+    });
+
+    expect(tasks).toHaveLength(1);
+    expect(select.mock.calls[0]?.[0]).toContain("title LIKE $1 ESCAPE '\\'");
+    expect(select.mock.calls[0]?.[0]).toContain("project_id IS $2");
+    expect(select.mock.calls[0]?.[0]).toContain("priority = $3");
+    expect(select.mock.calls[0]?.[0]).toContain("EXISTS (SELECT 1 FROM task_tags");
+    expect(select.mock.calls[0]?.[1]).toEqual(["%计划\\_2026\\%%", "project-1", 2, "tag-1"]);
+  });
+
   it("updates task notes, priority and scheduling fields together", async () => {
     const updatedRow = {
       ...taskRow,

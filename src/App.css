@@ -391,6 +391,45 @@ h1 {
   font-size: 13px;
 }
 
+.task-filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  border-bottom: 1px solid #edf1f5;
+  padding: 14px 22px;
+}
+
+.search-field,
+.compact-filter {
+  display: grid;
+  gap: 5px;
+  color: #5c6d7e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.search-field {
+  min-width: min(100%, 250px);
+  flex: 1 1 250px;
+}
+
+.compact-filter select,
+.search-field input {
+  min-height: 36px;
+  border: 1px solid #cbd4df;
+  border-radius: 8px;
+  background: #fff;
+  padding: 7px 9px;
+  color: #17202a;
+}
+
+.compact-filter select:focus,
+.search-field input:focus {
+  border-color: #3f5efb;
+  outline: 3px solid rgb(63 94 251 / 15%);
+}
+
 .task-list ul {
   margin: 0;
   padding: 0;
@@ -902,6 +941,7 @@ h1 {
   }
 
   .task-list-heading,
+  .task-filter-controls,
   .task-row,
   .subtask-section,
   .tag-section,
@@ -915,6 +955,8 @@ h1 {
   }
 
   .task-list-heading p,
+  .search-field,
+  .compact-filter,
   .quick-add-dialog label,
   .task-title,
   .quick-add-dialog input,
@@ -926,6 +968,13 @@ h1 {
   .subtask-create-form input,
   .project-list li,
   .secondary-button {
+    color: #dbe3eb;
+  }
+
+  .compact-filter select,
+  .search-field input {
+    border-color: #3a4553;
+    background: #1d242d;
     color: #dbe3eb;
   }
 
