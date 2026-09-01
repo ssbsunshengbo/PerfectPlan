@@ -11,6 +11,12 @@ type ProjectRow = {
   updated_at: string;
 };
 
+export type UpdateProjectInput = {
+  color?: string | null;
+  name?: string;
+  sortOrder?: number;
+};
+
 export function normalizeProjectName(name: string): string {
   const normalizedName = name.trim();
 
@@ -19,6 +25,17 @@ export function normalizeProjectName(name: string): string {
   }
 
   return normalizedName;
+}
+
+function normalizeProjectColor(color: string | null | undefined): string | null {
+  const normalizedColor = color?.trim() ?? "";
+
+  if (!normalizedColor) return null;
+  if (!/^#[0-9a-fA-F]{6}$/.test(normalizedColor)) {
+    throw new Error("项目颜色必须是 6 位十六进制颜色值");
+  }
+
+  return normalizedColor.toLowerCase();
 }
 
 function toProjectStatus(status: string): ProjectStatus {
@@ -89,5 +106,77 @@ export const projectService = {
     );
 
     return rows.map(toProjectRecord);
+  },
+
+  async listProjects(): Promise<ProjectRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<ProjectRow[]>(
+      `SELECT id, name, color, status, sort_order, created_at, updated_at
+       FROM projects
+       ORDER BY status ASC, sort_order ASC, created_at ASC`,
+    );
+
+    return rows.map(toProjectRecord);
+  },
+
+  async updateProject(projectId: string, input: UpdateProjectInput): Promise<ProjectRecord> {
+    const updates: Array<{ column: string; value: string | number | null }> = [];
+
+    if ("name" in input) {
+      updates.push({ column: "name", value: normalizeProjectName(input.name ?? "") });
+    }
+    if ("color" in input) {
+      updates.push({ column: "color", value: normalizeProjectColor(input.color) });
+    }
+    if ("sortOrder" in input) {
+      if (input.sortOrder === undefined || !Number.isFinite(input.sortOrder)) {
+        throw new Error("项目排序值无效");
+      }
+      updates.push({ column: "sort_order", value: input.sortOrder });
+    }
+
+    if (updates.length === 0) return requireProject(projectId);
+
+    updates.push({ column: "updated_at", value: new Date().toISOString() });
+    const assignments = updates.map(({ column }, index) => `${column} = $${index + 1}`).join(", ");
+    const database = await getDatabase();
+    const result = await database.execute(
+      `UPDATE projects SET ${assignments} WHERE id = $${updates.length + 1}`,
+      [...updates.map(({ value }) => value), projectId],
+    );
+
+    if (result.rowsAffected === 0) {
+      throw new Error(`找不到项目：${projectId}`);
+    }
+
+    return requireProject(projectId);
+  },
+
+  async archiveProject(projectId: string): Promise<ProjectRecord> {
+    const database = await getDatabase();
+    const result = await database.execute(
+      "UPDATE projects SET status = $1, updated_at = $2 WHERE id = $3",
+      ["archived", new Date().toISOString(), projectId],
+    );
+
+    if (result.rowsAffected === 0) {
+      throw new Error(`找不到项目：${projectId}`);
+    }
+
+    return requireProject(projectId);
+  },
+
+  async restoreProject(projectId: string): Promise<ProjectRecord> {
+    const database = await getDatabase();
+    const result = await database.execute(
+      "UPDATE projects SET status = $1, updated_at = $2 WHERE id = $3",
+      ["active", new Date().toISOString(), projectId],
+    );
+
+    if (result.rowsAffected === 0) {
+      throw new Error(`找不到项目：${projectId}`);
+    }
+
+    return requireProject(projectId);
   },
 };

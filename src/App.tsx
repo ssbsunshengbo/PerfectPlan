@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import "./App.css";
 import { getDatabaseHealth } from "./features/database/database";
-import { projectService } from "./features/projects/project-service";
+import { projectService, type UpdateProjectInput } from "./features/projects/project-service";
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
 import type { TagRecord } from "./features/tags/tag-types";
@@ -24,11 +24,14 @@ function App() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [subtasks, setSubtasks] = useState<TaskRecord[]>([]);
   const [taskTags, setTaskTags] = useState<TagRecord[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
+  const [projectDraftColor, setProjectDraftColor] = useState("");
+  const [projectDraftName, setProjectDraftName] = useState("");
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [isSavingTag, setIsSavingTag] = useState(false);
@@ -57,7 +60,7 @@ function App() {
 
         const [activeTasks, activeProjects, availableTags] = await Promise.all([
           taskService.listActiveTasks(),
-          projectService.listActiveProjects(),
+          projectService.listProjects(),
           tagService.listTags(),
         ]);
         if (!isMounted) return;
@@ -126,6 +129,62 @@ function App() {
       setIsProjectCreateOpen(false);
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "创建项目失败，请重试。");
+    } finally {
+      setIsSavingProject(false);
+    }
+  }
+
+  function openProjectEditor(project: ProjectRecord) {
+    setTaskError(null);
+    setProjectDraftColor(project.color ?? "");
+    setProjectDraftName(project.name);
+    setSelectedProject(project);
+  }
+
+  async function handleSaveProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedProject) return;
+
+    setTaskError(null);
+    setIsSavingProject(true);
+
+    try {
+      const input: UpdateProjectInput = {
+        color: projectDraftColor || null,
+        name: projectDraftName,
+      };
+      const project = await projectService.updateProject(selectedProject.id, input);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === project.id ? project : currentProject,
+        ),
+      );
+      setSelectedProject(null);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "保存项目失败，请重试。");
+    } finally {
+      setIsSavingProject(false);
+    }
+  }
+
+  async function handleProjectStatusChange(shouldArchive: boolean) {
+    if (!selectedProject) return;
+
+    setTaskError(null);
+    setIsSavingProject(true);
+
+    try {
+      const project = shouldArchive
+        ? await projectService.archiveProject(selectedProject.id)
+        : await projectService.restoreProject(selectedProject.id);
+      setProjects((currentProjects) =>
+        currentProjects.map((currentProject) =>
+          currentProject.id === project.id ? project : currentProject,
+        ),
+      );
+      setSelectedProject(null);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "更新项目状态失败，请重试。");
     } finally {
       setIsSavingProject(false);
     }
@@ -261,6 +320,35 @@ function App() {
 
   const isInbox = activeView === "收集箱";
   const isProjects = activeView === "项目";
+  const activeProjects = projects.filter((project) => project.status === "active");
+  const archivedProjects = projects.filter((project) => project.status === "archived");
+
+  async function handleMoveProject(projectId: string, direction: -1 | 1) {
+    const currentIndex = activeProjects.findIndex((project) => project.id === projectId);
+    const targetIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= activeProjects.length) return;
+
+    const reorderedProjects = [...activeProjects];
+    const [project] = reorderedProjects.splice(currentIndex, 1);
+    if (!project) return;
+    reorderedProjects.splice(targetIndex, 0, project);
+
+    setTaskError(null);
+    try {
+      const updatedProjects = await Promise.all(
+        reorderedProjects.map((currentProject, index) =>
+          projectService.updateProject(currentProject.id, { sortOrder: index }),
+        ),
+      );
+      setProjects((currentProjects) => [
+        ...updatedProjects,
+        ...currentProjects.filter((currentProject) => currentProject.status === "archived"),
+      ]);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "调整项目排序失败，请重试。");
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -363,15 +451,81 @@ function App() {
                 新建项目
               </button>
             </div>
-            {projects.length > 0 ? (
+            {activeProjects.length > 0 ? (
               <ul>
-                {projects.map((project) => (
-                  <li key={project.id}>{project.name}</li>
+                {activeProjects.map((project, index) => (
+                  <li className="project-row" key={project.id}>
+                    <span
+                      aria-hidden="true"
+                      className="project-color"
+                      style={{ backgroundColor: project.color ?? "#98a6b5" }}
+                    />
+                    <div className="project-summary">
+                      <strong>{project.name}</strong>
+                      <span>
+                        {tasks.filter((task) => task.projectId === project.id).length} 条活动任务
+                      </span>
+                    </div>
+                    <div className="project-actions">
+                      <button
+                        aria-label={`上移项目：${project.name}`}
+                        className="project-action-button"
+                        disabled={index === 0}
+                        onClick={() => void handleMoveProject(project.id, -1)}
+                        type="button"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        aria-label={`下移项目：${project.name}`}
+                        className="project-action-button"
+                        disabled={index === activeProjects.length - 1}
+                        onClick={() => void handleMoveProject(project.id, 1)}
+                        type="button"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() => openProjectEditor(project)}
+                        type="button"
+                      >
+                        管理
+                      </button>
+                    </div>
+                  </li>
                 ))}
               </ul>
             ) : (
               <p className="project-empty">还没有项目。先创建一个，用来归纳相关任务。</p>
             )}
+            {archivedProjects.length > 0 ? (
+              <div className="archived-projects">
+                <h3>已归档</h3>
+                <ul>
+                  {archivedProjects.map((project) => (
+                    <li className="project-row is-archived" key={project.id}>
+                      <span
+                        aria-hidden="true"
+                        className="project-color"
+                        style={{ backgroundColor: project.color ?? "#98a6b5" }}
+                      />
+                      <div className="project-summary">
+                        <strong>{project.name}</strong>
+                        <span>任务会保留原归属</span>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        onClick={() => openProjectEditor(project)}
+                        type="button"
+                      >
+                        查看
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </section>
         ) : (
           <section className="empty-state" aria-labelledby="future-view-title">
@@ -529,6 +683,116 @@ function App() {
                 </button>
                 <button className="primary-button" disabled={isSavingProject} type="submit">
                   {isSavingProject ? "正在创建…" : "创建项目"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {selectedProject ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-labelledby="edit-project-title"
+            aria-modal="true"
+            className="quick-add-dialog"
+            role="dialog"
+          >
+            <div className="quick-add-header">
+              <div>
+                <p className="eyebrow">
+                  {selectedProject.status === "active" ? "项目" : "已归档项目"}
+                </p>
+                <h2 id="edit-project-title">管理项目</h2>
+              </div>
+              <button
+                aria-label="关闭项目管理窗口"
+                className="icon-button"
+                disabled={isSavingProject}
+                onClick={() => setSelectedProject(null)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={(event) => void handleSaveProject(event)}>
+              <label htmlFor="edit-project-name">项目名称</label>
+              <input
+                autoFocus
+                disabled={isSavingProject}
+                id="edit-project-name"
+                onChange={(event) => setProjectDraftName(event.target.value)}
+                value={projectDraftName}
+              />
+              <div className="project-color-field">
+                <span>项目颜色</span>
+                {projectDraftColor ? (
+                  <div>
+                    <input
+                      aria-label="选择项目颜色"
+                      disabled={isSavingProject}
+                      onChange={(event) => setProjectDraftColor(event.target.value)}
+                      type="color"
+                      value={projectDraftColor}
+                    />
+                    <button
+                      className="text-button"
+                      disabled={isSavingProject}
+                      onClick={() => setProjectDraftColor("")}
+                      type="button"
+                    >
+                      清除颜色
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="text-button"
+                    disabled={isSavingProject}
+                    onClick={() => setProjectDraftColor("#3f5efb")}
+                    type="button"
+                  >
+                    添加颜色
+                  </button>
+                )}
+              </div>
+              {taskError ? <p className="form-error">{taskError}</p> : null}
+              <div className="dialog-actions project-dialog-actions">
+                {selectedProject.status === "active" ? (
+                  <button
+                    className="danger-button"
+                    disabled={isSavingProject}
+                    onClick={() => {
+                      if (
+                        window.confirm(`归档「${selectedProject.name}」？任务会保留原项目归属。`)
+                      ) {
+                        void handleProjectStatusChange(true);
+                      }
+                    }}
+                    type="button"
+                  >
+                    归档项目
+                  </button>
+                ) : (
+                  <button
+                    className="secondary-button"
+                    disabled={isSavingProject}
+                    onClick={() => void handleProjectStatusChange(false)}
+                    type="button"
+                  >
+                    恢复项目
+                  </button>
+                )}
+                <span />
+                <button
+                  className="secondary-button"
+                  disabled={isSavingProject}
+                  onClick={() => setSelectedProject(null)}
+                  type="button"
+                >
+                  取消
+                </button>
+                <button className="primary-button" disabled={isSavingProject} type="submit">
+                  {isSavingProject ? "正在保存…" : "保存项目"}
                 </button>
               </div>
             </form>

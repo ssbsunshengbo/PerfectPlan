@@ -211,8 +211,12 @@ export function TaskDetailDialog({
               >
                 <option value="">收集箱</option>
                 {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
+                  <option
+                    disabled={project.status === "archived" && project.id !== draft.projectId}
+                    key={project.id}
+                    value={project.id}
+                  >
+                    {project.status === "archived" ? `${project.name}（已归档）` : project.name}
                   </option>
                 ))}
               </select>

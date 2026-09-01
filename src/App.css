@@ -255,6 +255,67 @@ h1 {
   font-weight: 700;
 }
 
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-color {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.project-summary {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+
+.project-summary span {
+  color: #718092;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.project-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.project-action-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #d7dfe7;
+  border-radius: 7px;
+  background: #fff;
+  color: #52606d;
+}
+
+.project-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.archived-projects {
+  border-top: 1px solid #edf1f5;
+  padding-top: 16px;
+}
+
+.archived-projects h3 {
+  margin: 0 22px 8px;
+  color: #718092;
+  font-size: 13px;
+}
+
+.project-row.is-archived {
+  opacity: 0.72;
+}
+
 .project-list li:last-child {
   border-bottom: 0;
 }
@@ -264,6 +325,50 @@ h1 {
   padding: 22px;
   color: #718092;
   font-size: 14px;
+}
+
+.project-color-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  color: #3d4b5c;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.project-color-field > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-color-field input[type="color"] {
+  width: 42px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: #304ccf;
+  font-weight: 700;
+}
+
+.danger-button {
+  border: 1px solid #f0c9c9;
+  border-radius: 9px;
+  background: #fff;
+  padding: 9px 13px;
+  color: #b43d3d;
+  font-weight: 700;
+}
+
+.project-dialog-actions > span {
+  flex: 1;
 }
 
 .task-list-heading {
@@ -768,6 +873,11 @@ h1 {
     border-color: #303946;
   }
 
+  .project-summary span,
+  .archived-projects h3 {
+    color: #aebbc8;
+  }
+
   .task-list-heading p,
   .quick-add-dialog label,
   .task-title,
@@ -804,6 +914,20 @@ h1 {
 
   .project-empty {
     color: #aebbc8;
+  }
+
+  .project-action-button,
+  .danger-button {
+    border-color: #3a4553;
+    background: #1d242d;
+  }
+
+  .project-action-button {
+    color: #c8d3df;
+  }
+
+  .danger-button {
+    color: #ffb9b9;
   }
 
   .subtask-heading span {
