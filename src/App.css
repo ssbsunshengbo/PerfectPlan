@@ -233,6 +233,39 @@ h1 {
   overflow: hidden;
 }
 
+.project-list {
+  align-self: start;
+  border: 1px solid #e2e7ec;
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.project-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-list li {
+  min-height: 56px;
+  border-bottom: 1px solid #edf1f5;
+  padding: 17px 22px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.project-list li:last-child {
+  border-bottom: 0;
+}
+
+.project-empty {
+  margin: 0;
+  padding: 22px;
+  color: #718092;
+  font-size: 14px;
+}
+
 .task-list-heading {
   display: flex;
   align-items: center;
@@ -288,10 +321,21 @@ h1 {
 
 .task-title {
   min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
   overflow: hidden;
   font-size: 15px;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.task-title:hover {
+  color: #304ccf;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .task-error {
@@ -385,6 +429,17 @@ h1 {
   padding: 24px;
 }
 
+.task-details-dialog {
+  width: min(100%, 640px);
+  max-height: min(800px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid #e2e7ec;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgb(23 32 42 / 24%);
+  padding: 24px;
+}
+
 .quick-add-header {
   display: flex;
   align-items: flex-start;
@@ -445,6 +500,154 @@ h1 {
 .quick-add-dialog input:focus {
   border-color: #3f5efb;
   outline: 3px solid rgb(63 94 251 / 15%);
+}
+
+.task-details-form {
+  display: grid;
+  gap: 16px;
+}
+
+.task-details-form label {
+  display: grid;
+  gap: 8px;
+  color: #3d4b5c;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.task-details-form input,
+.task-details-form textarea,
+.task-details-form select {
+  width: 100%;
+  border: 1px solid #cbd4df;
+  border-radius: 9px;
+  background: #fff;
+  padding: 10px 12px;
+  color: #17202a;
+  font-weight: 400;
+}
+
+.task-details-form textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+
+.task-details-form input:focus,
+.task-details-form textarea:focus,
+.task-details-form select:focus {
+  border-color: #3f5efb;
+  outline: 3px solid rgb(63 94 251 / 15%);
+}
+
+.detail-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.subtask-section {
+  margin-top: 28px;
+  border-top: 1px solid #edf1f5;
+  padding-top: 20px;
+}
+
+.tag-section {
+  margin-top: 28px;
+  border-top: 1px solid #edf1f5;
+  padding-top: 20px;
+}
+
+.tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.tag-chip {
+  border: 1px solid #d7dfe7;
+  border-radius: 999px;
+  background: #fff;
+  padding: 5px 10px;
+  color: #52606d;
+  font-size: 13px;
+}
+
+.tag-chip:hover {
+  border-color: #93a4ff;
+  background: #f1f3ff;
+  color: #304ccf;
+}
+
+.tag-chip.is-selected {
+  border-color: #8193fa;
+  background: #e9edff;
+  color: #304ccf;
+  font-weight: 700;
+}
+
+.subtask-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subtask-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.subtask-heading span {
+  border-radius: 999px;
+  background: #edf1f5;
+  padding: 2px 8px;
+  color: #52606d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subtask-list {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.subtask-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  color: #405064;
+  font-size: 14px;
+}
+
+.subtask-list .task-complete-button {
+  width: 18px;
+  height: 18px;
+}
+
+.subtask-empty {
+  margin: 10px 0;
+  color: #718092;
+  font-size: 13px;
+}
+
+.subtask-create-form {
+  display: flex;
+  gap: 8px;
+}
+
+.subtask-create-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #cbd4df;
+  border-radius: 9px;
+  background: #fff;
+  padding: 9px 10px;
+  color: #17202a;
 }
 
 .form-error {
@@ -544,16 +747,24 @@ h1 {
   }
 
   .task-list,
+  .project-list,
   .quick-add-dialog,
+  .task-details-dialog,
   .task-complete-button,
   .quick-add-dialog input,
+  .task-details-form input,
+  .task-details-form textarea,
+  .task-details-form select,
   .secondary-button {
     border-color: #3a4553;
     background: #1d242d;
   }
 
   .task-list-heading,
-  .task-row {
+  .task-row,
+  .subtask-section,
+  .tag-section,
+  .project-list li {
     border-color: #303946;
   }
 
@@ -561,6 +772,13 @@ h1 {
   .quick-add-dialog label,
   .task-title,
   .quick-add-dialog input,
+  .task-details-form label,
+  .task-details-form input,
+  .task-details-form textarea,
+  .task-details-form select,
+  .subtask-list li,
+  .subtask-create-form input,
+  .project-list li,
   .secondary-button {
     color: #dbe3eb;
   }
@@ -584,10 +802,36 @@ h1 {
     color: #aebbc8;
   }
 
+  .project-empty {
+    color: #aebbc8;
+  }
+
+  .subtask-heading span {
+    background: #303946;
+    color: #c8d3df;
+  }
+
+  .tag-chip {
+    border-color: #3a4553;
+    background: #1d242d;
+    color: #c8d3df;
+  }
+
+  .tag-chip:hover,
+  .tag-chip.is-selected {
+    border-color: #6c80dd;
+    background: #253361;
+    color: #d1d9ff;
+  }
+
   .icon-button:hover,
   .secondary-button:hover {
     background: #27313d;
     color: #eef2f6;
+  }
+
+  .task-title:hover {
+    color: #bdc9ff;
   }
 
   .empty-state p,

@@ -77,4 +77,56 @@ describe("taskService", () => {
     expect(execute.mock.calls[0]?.[0]).toContain("SET status = $1, deleted_at = $2");
     expect(execute.mock.calls[0]?.[1]?.[0]).toBe("trashed");
   });
+
+  it("updates task notes, priority and scheduling fields together", async () => {
+    const updatedRow = {
+      ...taskRow,
+      notes: "先整理需求，再安排时间",
+      priority: 3,
+      scheduled_date: "2026-09-03",
+      scheduled_start_at: "2026-09-03T01:30:00.000Z",
+      estimated_minutes: 45,
+      due_date: "2026-09-04",
+    };
+    select.mockResolvedValueOnce([taskRow]).mockResolvedValueOnce([updatedRow]);
+    execute.mockResolvedValueOnce({ rowsAffected: 1 });
+
+    const task = await taskService.updateTask("task-1", {
+      dueDate: "2026-09-04",
+      estimatedMinutes: 45,
+      notes: "先整理需求，再安排时间",
+      priority: 3,
+      scheduledDate: "2026-09-03",
+      scheduledStartAt: "2026-09-03T01:30:00.000Z",
+    });
+
+    expect(task).toMatchObject({
+      dueDate: "2026-09-04",
+      estimatedMinutes: 45,
+      notes: "先整理需求，再安排时间",
+      priority: 3,
+      scheduledDate: "2026-09-03",
+    });
+    expect(execute.mock.calls[0]?.[0]).toContain("scheduled_start_at = $4");
+  });
+
+  it("creates a one-level subtask that inherits its parent project", async () => {
+    select
+      .mockResolvedValueOnce([{ ...taskRow, project_id: "project-1" }])
+      .mockResolvedValueOnce([
+        { ...taskRow, id: "subtask-1", parent_task_id: "task-1", project_id: "project-1" },
+      ]);
+
+    await taskService.createSubtask("task-1", "整理设计稿");
+
+    expect(execute.mock.calls[0]?.[0]).toContain("INSERT INTO tasks");
+    expect(execute.mock.calls[0]?.[1]?.slice(1, 7)).toEqual([
+      "整理设计稿",
+      "",
+      "active",
+      0,
+      "project-1",
+      "task-1",
+    ]);
+  });
 });

@@ -39,6 +39,10 @@ export type UpdateTaskInput = {
   notes?: string;
   priority?: TaskPriority;
   projectId?: string | null;
+  scheduledDate?: string | null;
+  scheduledStartAt?: string | null;
+  estimatedMinutes?: number | null;
+  dueDate?: string | null;
 };
 
 export class TaskNotFoundError extends Error {
@@ -66,6 +70,37 @@ export function normalizeTaskTitle(title: string): string {
 
 function now(): string {
   return new Date().toISOString();
+}
+
+function normalizeLocalDate(value: string | null | undefined, fieldName: string): string | null {
+  const normalizedValue = value?.trim() ?? "";
+
+  if (!normalizedValue) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedValue)) {
+    throw new Error(`${fieldName}必须是 YYYY-MM-DD 格式`);
+  }
+
+  return normalizedValue;
+}
+
+function normalizeScheduledStartAt(value: string | null | undefined): string | null {
+  const normalizedValue = value?.trim() ?? "";
+
+  if (!normalizedValue) return null;
+  if (Number.isNaN(Date.parse(normalizedValue))) {
+    throw new Error("计划开始时间无效");
+  }
+
+  return normalizedValue;
+}
+
+function normalizeEstimatedMinutes(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("预计时长必须是大于 0 的整数分钟");
+  }
+
+  return value;
 }
 
 function toTaskStatus(status: string): TaskStatus {
@@ -164,6 +199,29 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
+  async listActiveSubtasks(parentTaskId: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status = 'active' AND parent_task_id = $1
+       ORDER BY sort_order ASC, created_at ASC`,
+      [parentTaskId],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async createSubtask(parentTaskId: string, title: string): Promise<TaskRecord> {
+    const parentTask = await requireTask(parentTaskId);
+
+    return taskService.createTask({
+      parentTaskId,
+      projectId: parentTask.projectId,
+      title,
+    });
+  },
+
   async updateTask(taskId: string, input: UpdateTaskInput): Promise<TaskRecord> {
     const updates: Array<{ column: string; value: string | number | null }> = [];
 
@@ -183,9 +241,48 @@ export const taskService = {
     if ("projectId" in input) {
       updates.push({ column: "project_id", value: input.projectId ?? null });
     }
+    if ("scheduledDate" in input) {
+      updates.push({
+        column: "scheduled_date",
+        value: normalizeLocalDate(input.scheduledDate, "计划日期"),
+      });
+    }
+    if ("scheduledStartAt" in input) {
+      updates.push({
+        column: "scheduled_start_at",
+        value: normalizeScheduledStartAt(input.scheduledStartAt),
+      });
+    }
+    if ("estimatedMinutes" in input) {
+      updates.push({
+        column: "estimated_minutes",
+        value: normalizeEstimatedMinutes(input.estimatedMinutes),
+      });
+    }
+    if ("dueDate" in input) {
+      updates.push({ column: "due_date", value: normalizeLocalDate(input.dueDate, "截止日期") });
+    }
 
     if (updates.length === 0) {
       return requireTask(taskId);
+    }
+
+    const existingTask = await requireTask(taskId);
+    const nextScheduledDate =
+      "scheduledDate" in input
+        ? normalizeLocalDate(input.scheduledDate, "计划日期")
+        : existingTask.scheduledDate;
+    const nextScheduledStartAt =
+      "scheduledStartAt" in input
+        ? normalizeScheduledStartAt(input.scheduledStartAt)
+        : existingTask.scheduledStartAt;
+
+    if (nextScheduledStartAt && !nextScheduledDate) {
+      throw new Error("设置计划开始时间前，请先选择计划日期");
+    }
+
+    if ("scheduledDate" in input && nextScheduledDate === null && !("scheduledStartAt" in input)) {
+      updates.push({ column: "scheduled_start_at", value: null });
     }
 
     updates.push({ column: "updated_at", value: now() });
