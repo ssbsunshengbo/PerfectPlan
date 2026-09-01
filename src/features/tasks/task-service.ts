@@ -219,6 +219,18 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
+  async listTrashedTasks(): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status = 'trashed' AND parent_task_id IS NULL
+       ORDER BY deleted_at DESC, created_at DESC`,
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
   async listActiveSubtasks(parentTaskId: string): Promise<TaskRecord[]> {
     const database = await getDatabase();
     const rows = await database.select<TaskRow[]>(
@@ -343,7 +355,7 @@ export const taskService = {
     const result = await database.execute(
       `UPDATE tasks
        SET status = $1, deleted_at = $2, updated_at = $3
-       WHERE id = $4`,
+       WHERE id = $4 OR parent_task_id = $4`,
       ["trashed", deletedAt, deletedAt, taskId],
     );
 
@@ -360,7 +372,7 @@ export const taskService = {
     const result = await database.execute(
       `UPDATE tasks
        SET status = $1, completed_at = NULL, deleted_at = NULL, updated_at = $2
-       WHERE id = $3`,
+       WHERE id = $3 OR parent_task_id = $3`,
       ["active", updatedAt, taskId],
     );
 

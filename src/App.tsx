@@ -12,8 +12,12 @@ import type { TaskRecord } from "./features/tasks/task-types";
 
 type DatabaseState = "loading" | "ready" | "error";
 
-const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项目", "标签"] as const;
+const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项目", "标签", "回收站"] as const;
 type NavigationItem = (typeof navigationItems)[number];
+type ReversibleTaskAction = {
+  kind: "created" | "completed" | "trashed";
+  task: Pick<TaskRecord, "id" | "title">;
+};
 
 function App() {
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
@@ -22,6 +26,7 @@ function App() {
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
@@ -38,10 +43,8 @@ function App() {
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [isSavingTaskDetails, setIsSavingTaskDetails] = useState(false);
   const [isSavingSubtask, setIsSavingSubtask] = useState(false);
-  const [lastCreatedTask, setLastCreatedTask] = useState<Pick<TaskRecord, "id" | "title"> | null>(
-    null,
-  );
-  const [isUndoingCreate, setIsUndoingCreate] = useState(false);
+  const [lastTaskAction, setLastTaskAction] = useState<ReversibleTaskAction | null>(null);
+  const [isUndoingTaskAction, setIsUndoingTaskAction] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -107,7 +110,7 @@ function App() {
       if (!activeTagId) {
         setTasks((currentTasks) => [task, ...currentTasks]);
       }
-      setLastCreatedTask({ id: task.id, title: task.title });
+      setLastTaskAction({ kind: "created", task: { id: task.id, title: task.title } });
       setNewTaskTitle("");
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "创建任务失败，请重试。");
@@ -116,12 +119,23 @@ function App() {
     }
   }
 
-  async function handleCompleteTask(taskId: string) {
+  async function handleCompleteTask(task: TaskRecord) {
     setTaskError(null);
 
     try {
-      await taskService.completeTask(taskId);
-      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== taskId));
+      const activeSubtasks = await taskService.listActiveSubtasks(task.id);
+      if (
+        activeSubtasks.length > 0 &&
+        !window.confirm(
+          `「${task.title}」还有 ${activeSubtasks.length} 个未完成子任务。完成父任务不会完成子任务，仍要继续吗？`,
+        )
+      ) {
+        return;
+      }
+
+      await taskService.completeTask(task.id);
+      setTasks((currentTasks) => currentTasks.filter((currentTask) => currentTask.id !== task.id));
+      setLastTaskAction({ kind: "completed", task: { id: task.id, title: task.title } });
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新任务失败，请重试。");
     }
@@ -313,20 +327,73 @@ function App() {
     }
   }
 
-  async function handleUndoCreate() {
-    if (!lastCreatedTask) return;
+  async function handleTrashTask(task: TaskRecord) {
+    if (!window.confirm(`删除「${task.title}」？它会移入回收站，可随时恢复。`)) return;
 
     setTaskError(null);
-    setIsUndoingCreate(true);
 
     try {
-      await taskService.trashTask(lastCreatedTask.id);
-      setTasks((currentTasks) => currentTasks.filter((task) => task.id !== lastCreatedTask.id));
-      setLastCreatedTask(null);
+      const trashedTask = await taskService.trashTask(task.id);
+      setTasks((currentTasks) => currentTasks.filter((currentTask) => currentTask.id !== task.id));
+      setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
+      setLastTaskAction({ kind: "trashed", task: { id: task.id, title: task.title } });
+      setSelectedTask(null);
     } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "撤销添加失败，请重试。");
+      setTaskError(error instanceof Error ? error.message : "删除任务失败，请重试。");
+    }
+  }
+
+  async function handleRestoreTask(task: TaskRecord) {
+    setTaskError(null);
+
+    try {
+      await taskService.restoreTask(task.id);
+      setTrashedTasks((currentTasks) =>
+        currentTasks.filter((currentTask) => currentTask.id !== task.id),
+      );
+      if (activeView === "收集箱") await loadInboxTasks();
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "恢复任务失败，请重试。");
+    }
+  }
+
+  async function handleUndoTaskAction() {
+    if (!lastTaskAction) return;
+
+    setTaskError(null);
+    setIsUndoingTaskAction(true);
+
+    try {
+      if (lastTaskAction.kind === "created") {
+        const trashedTask = await taskService.trashTask(lastTaskAction.task.id);
+        setTasks((currentTasks) =>
+          currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
+        );
+        setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
+      } else {
+        await taskService.restoreTask(lastTaskAction.task.id);
+        setTrashedTasks((currentTasks) =>
+          currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
+        );
+        await loadInboxTasks();
+      }
+      setLastTaskAction(null);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "撤销操作失败，请重试。");
     } finally {
-      setIsUndoingCreate(false);
+      setIsUndoingTaskAction(false);
+    }
+  }
+
+  async function handleNavigation(item: NavigationItem) {
+    setActiveView(item);
+    setTaskError(null);
+
+    try {
+      if (item === "收集箱") await loadInboxTasks();
+      if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
     }
   }
 
@@ -369,6 +436,7 @@ function App() {
   const isInbox = activeView === "收集箱";
   const isProjects = activeView === "项目";
   const isTags = activeView === "标签";
+  const isTrash = activeView === "回收站";
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
 
@@ -415,7 +483,7 @@ function App() {
               <li key={item}>
                 <button
                   className={item === activeView ? "nav-item is-active" : "nav-item"}
-                  onClick={() => setActiveView(item)}
+                  onClick={() => void handleNavigation(item)}
                   type="button"
                 >
                   {item}
@@ -493,7 +561,7 @@ function App() {
                     <button
                       aria-label={`完成任务：${task.title}`}
                       className="task-complete-button"
-                      onClick={() => void handleCompleteTask(task.id)}
+                      onClick={() => void handleCompleteTask(task)}
                       type="button"
                     />
                     <button
@@ -502,6 +570,14 @@ function App() {
                       type="button"
                     >
                       {task.title}
+                    </button>
+                    <button
+                      aria-label={`删除任务：${task.title}`}
+                      className="task-delete-button"
+                      onClick={() => void handleTrashTask(task)}
+                      type="button"
+                    >
+                      删除
                     </button>
                   </li>
                 ))}
@@ -633,6 +709,36 @@ function App() {
               <p className="project-empty">还没有标签。可在任务详情中创建并添加标签。</p>
             )}
           </section>
+        ) : isTrash ? (
+          <section className="project-list" aria-labelledby="trash-title">
+            <div className="task-list-heading">
+              <div>
+                <h2 id="trash-title">回收站</h2>
+                <p>任务会保留原项目、标签和时间信息。</p>
+              </div>
+            </div>
+            {trashedTasks.length > 0 ? (
+              <ul>
+                {trashedTasks.map((task) => (
+                  <li className="project-row" key={task.id}>
+                    <div className="project-summary">
+                      <strong>{task.title}</strong>
+                      <span>删除后仍可恢复</span>
+                    </div>
+                    <button
+                      className="secondary-button"
+                      onClick={() => void handleRestoreTask(task)}
+                      type="button"
+                    >
+                      恢复任务
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="project-empty">回收站为空。删除的任务会出现在这里，直到你恢复它。</p>
+            )}
+          </section>
         ) : (
           <section className="empty-state" aria-labelledby="future-view-title">
             <span className="empty-state-icon" aria-hidden="true">
@@ -649,15 +755,21 @@ function App() {
           </p>
         ) : null}
 
-        {lastCreatedTask ? (
+        {lastTaskAction ? (
           <div className="undo-toast" aria-live="polite">
-            <span>已添加「{lastCreatedTask.title}」</span>
+            <span>
+              {lastTaskAction.kind === "created"
+                ? `已添加「${lastTaskAction.task.title}」`
+                : lastTaskAction.kind === "completed"
+                  ? `已完成「${lastTaskAction.task.title}」`
+                  : `已移入回收站「${lastTaskAction.task.title}」`}
+            </span>
             <button
-              disabled={isUndoingCreate}
-              onClick={() => void handleUndoCreate()}
+              disabled={isUndoingTaskAction}
+              onClick={() => void handleUndoTaskAction()}
               type="button"
             >
-              {isUndoingCreate ? "正在撤销…" : "撤销"}
+              {isUndoingTaskAction ? "正在撤销…" : "撤销"}
             </button>
           </div>
         ) : null}

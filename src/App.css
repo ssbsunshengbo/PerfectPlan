@@ -443,6 +443,21 @@ h1 {
   text-underline-offset: 3px;
 }
 
+.task-delete-button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  padding: 5px 4px;
+  color: #8795a1;
+  font-size: 13px;
+}
+
+.task-delete-button:hover {
+  color: #b43d3d;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .task-error {
   align-self: start;
   margin: -10px 0 0;
@@ -912,6 +927,14 @@ h1 {
   .project-list li,
   .secondary-button {
     color: #dbe3eb;
+  }
+
+  .task-delete-button {
+    color: #aebbc8;
+  }
+
+  .task-delete-button:hover {
+    color: #ffb9b9;
   }
 
   .task-complete-button:hover {

@@ -75,7 +75,27 @@ describe("taskService", () => {
 
     expect(task.status).toBe("trashed");
     expect(execute.mock.calls[0]?.[0]).toContain("SET status = $1, deleted_at = $2");
+    expect(execute.mock.calls[0]?.[0]).toContain("OR parent_task_id = $4");
     expect(execute.mock.calls[0]?.[1]?.[0]).toBe("trashed");
+  });
+
+  it("lists only root tasks from the recycle bin", async () => {
+    select.mockResolvedValueOnce([{ ...taskRow, status: "trashed", deleted_at: "2026-09-01" }]);
+
+    const tasks = await taskService.listTrashedTasks();
+
+    expect(tasks).toHaveLength(1);
+    expect(select.mock.calls[0]?.[0]).toContain("status = 'trashed' AND parent_task_id IS NULL");
+  });
+
+  it("restores a task and its direct subtasks", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+    execute.mockResolvedValueOnce({ rowsAffected: 2 });
+
+    const task = await taskService.restoreTask("task-1");
+
+    expect(task.status).toBe("active");
+    expect(execute.mock.calls[0]?.[0]).toContain("OR parent_task_id = $3");
   });
 
   it("lists active root tasks associated with a tag", async () => {
