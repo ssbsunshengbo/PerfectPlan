@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import "./App.css";
 import { getDatabaseHealth } from "./features/database/database";
@@ -49,6 +49,7 @@ function App() {
   const [lastTaskAction, setLastTaskAction] = useState<ReversibleTaskAction | null>(null);
   const [isUndoingTaskAction, setIsUndoingTaskAction] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -88,6 +89,27 @@ function App() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    function handleGlobalKeyDown(event: KeyboardEvent) {
+      if (!event.metaKey && !event.ctrlKey) return;
+
+      if (event.key.toLowerCase() === "n" && databaseState === "ready") {
+        event.preventDefault();
+        setIsQuickAddOpen(true);
+        return;
+      }
+
+      if (event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setActiveView("收集箱");
+        window.requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [databaseState]);
 
   async function loadInboxTasks(
     tagId = activeTagId,
@@ -556,7 +578,15 @@ function App() {
           </ul>
         </nav>
 
-        <button className="command-button" type="button">
+        <button
+          aria-keyshortcuts="Control+K Meta+K"
+          className="command-button"
+          onClick={() => {
+            setActiveView("收集箱");
+            window.requestAnimationFrame(() => searchInputRef.current?.focus());
+          }}
+          type="button"
+        >
           <span>快速查找</span>
           <kbd>⌘ K</kbd>
         </button>
@@ -571,6 +601,7 @@ function App() {
             <h1>{isInbox ? "先记下，稍后再安排" : activeView}</h1>
           </div>
           <button
+            aria-keyshortcuts="Control+N Meta+N"
             className="primary-button"
             disabled={databaseState !== "ready"}
             onClick={() => setIsQuickAddOpen(true)}
@@ -607,6 +638,7 @@ function App() {
                   id="task-search"
                   onChange={(event) => void handleSearchQueryChange(event.target.value)}
                   placeholder="搜索标题和备注"
+                  ref={searchInputRef}
                   type="search"
                   value={searchQuery}
                 />
@@ -684,13 +716,25 @@ function App() {
                   <li className="task-row" key={task.id}>
                     <button
                       aria-label={`完成任务：${task.title}`}
+                      aria-keyshortcuts="Space"
                       className="task-complete-button"
                       onClick={() => void handleCompleteTask(task)}
                       type="button"
                     />
                     <button
+                      aria-keyshortcuts="Enter Space Delete Backspace"
                       className="task-title"
                       onClick={() => void openTaskDetails(task)}
+                      onKeyDown={(event) => {
+                        if (event.key === " ") {
+                          event.preventDefault();
+                          void handleCompleteTask(task);
+                        }
+                        if (event.key === "Delete" || event.key === "Backspace") {
+                          event.preventDefault();
+                          void handleTrashTask(task);
+                        }
+                      }}
                       type="button"
                     >
                       {task.title}
