@@ -29,12 +29,14 @@ function App() {
   const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchInputValue, setSearchInputValue] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
+  const [pendingTaskDeletion, setPendingTaskDeletion] = useState<TaskRecord | null>(null);
   const [subtasks, setSubtasks] = useState<TaskRecord[]>([]);
   const [taskTags, setTaskTags] = useState<TagRecord[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -50,6 +52,7 @@ function App() {
   const [isUndoingTaskAction, setIsUndoingTaskAction] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const isSearchComposingRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -367,9 +370,11 @@ function App() {
     }
   }
 
-  async function handleTrashTask(task: TaskRecord) {
-    if (!window.confirm(`删除「${task.title}」？它会移入回收站，可随时恢复。`)) return;
+  function requestTrashTask(task: TaskRecord) {
+    setPendingTaskDeletion(task);
+  }
 
+  async function handleTrashTask(task: TaskRecord) {
     setTaskError(null);
 
     try {
@@ -378,6 +383,7 @@ function App() {
       setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
       setLastTaskAction({ kind: "trashed", task: { id: task.id, title: task.title } });
       setSelectedTask(null);
+      setPendingTaskDeletion(null);
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "删除任务失败，请重试。");
     }
@@ -484,6 +490,7 @@ function App() {
   async function handleClearInboxFilters() {
     setActiveTagId(null);
     setSearchQuery("");
+    setSearchInputValue("");
     setProjectFilter("all");
     setPriorityFilter("all");
     setTaskError(null);
@@ -641,11 +648,24 @@ function App() {
                 <span>搜索任务</span>
                 <input
                   id="task-search"
-                  onChange={(event) => void handleSearchQueryChange(event.target.value)}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setSearchInputValue(nextValue);
+                    if (!isSearchComposingRef.current) {
+                      void handleSearchQueryChange(nextValue);
+                    }
+                  }}
+                  onCompositionEnd={(event) => {
+                    isSearchComposingRef.current = false;
+                    void handleSearchQueryChange(event.currentTarget.value);
+                  }}
+                  onCompositionStart={() => {
+                    isSearchComposingRef.current = true;
+                  }}
                   placeholder="搜索标题和备注"
                   ref={searchInputRef}
                   type="search"
-                  value={searchQuery}
+                  value={searchInputValue}
                 />
               </label>
               <label className="compact-filter" htmlFor="project-filter">
@@ -737,7 +757,7 @@ function App() {
                         }
                         if (event.key === "Delete" || event.key === "Backspace") {
                           event.preventDefault();
-                          void handleTrashTask(task);
+                          requestTrashTask(task);
                         }
                       }}
                       type="button"
@@ -747,7 +767,7 @@ function App() {
                     <button
                       aria-label={`删除任务：${task.title}`}
                       className="task-delete-button"
-                      onClick={() => void handleTrashTask(task)}
+                      onClick={() => requestTrashTask(task)}
                       type="button"
                     >
                       删除
@@ -767,6 +787,7 @@ function App() {
                 <p>把相关任务组织在一起</p>
               </div>
               <button
+                autoFocus
                 className="secondary-button"
                 onClick={() => setIsProjectCreateOpen(true)}
                 type="button"
@@ -1000,6 +1021,43 @@ function App() {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {pendingTaskDeletion ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="delete-task-description"
+            aria-labelledby="delete-task-title"
+            aria-modal="true"
+            className="confirmation-dialog"
+            role="dialog"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setPendingTaskDeletion(null);
+            }}
+          >
+            <p className="eyebrow">任务操作</p>
+            <h2 id="delete-task-title">移入回收站？</h2>
+            <p id="delete-task-description">
+              「{pendingTaskDeletion.title}」会保留全部信息，并可随时从回收站恢复。
+            </p>
+            <div className="dialog-actions">
+              <button
+                className="secondary-button"
+                onClick={() => setPendingTaskDeletion(null)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => void handleTrashTask(pendingTaskDeletion)}
+                type="button"
+              >
+                移入回收站
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
