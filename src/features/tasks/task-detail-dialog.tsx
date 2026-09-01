@@ -41,6 +41,121 @@ const priorityOptions: Array<{ label: string; value: TaskPriority }> = [
   { label: "高", value: 3 },
 ];
 
+const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
+
+function toDateValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function parseDateValue(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function DatePickerField({
+  disabled,
+  id,
+  label,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  id: string;
+  label: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const selectedDate = parseDateValue(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => selectedDate ?? new Date());
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const firstWeekday = (monthStart.getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const calendarDays = Array.from({ length: firstWeekday + daysInMonth }, (_, index) =>
+    index < firstWeekday ? null : new Date(year, month, index - firstWeekday + 1),
+  );
+
+  function chooseDate(date: Date) {
+    onChange(toDateValue(date));
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="date-field">
+      <span id={`${id}-label`}>{label}</span>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-labelledby={`${id}-label`}
+        className={value ? "date-picker-trigger has-value" : "date-picker-trigger"}
+        disabled={disabled}
+        onClick={() => {
+          setVisibleMonth(selectedDate ?? new Date());
+          setIsOpen((current) => !current);
+        }}
+        type="button"
+      >
+        <span>{value || "选择日期"}</span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+      {isOpen ? (
+        <div aria-label={`${label}日历`} className="calendar-popover" role="dialog">
+          <div className="calendar-heading">
+            <button
+              aria-label="上个月"
+              onClick={() => setVisibleMonth(new Date(year, month - 1, 1))}
+              type="button"
+            >
+              ‹
+            </button>
+            <strong>{`${year} 年 ${month + 1} 月`}</strong>
+            <button
+              aria-label="下个月"
+              onClick={() => setVisibleMonth(new Date(year, month + 1, 1))}
+              type="button"
+            >
+              ›
+            </button>
+          </div>
+          <div className="calendar-weekdays">
+            {weekdayLabels.map((weekday) => (
+              <span key={weekday}>{weekday}</span>
+            ))}
+          </div>
+          <div className="calendar-days">
+            {calendarDays.map((date, index) =>
+              date ? (
+                <button
+                  className={toDateValue(date) === value ? "is-selected" : ""}
+                  key={toDateValue(date)}
+                  onClick={() => chooseDate(date)}
+                  type="button"
+                >
+                  {date.getDate()}
+                </button>
+              ) : (
+                <span key={`blank-${index}`} />
+              ),
+            )}
+          </div>
+          <div className="calendar-actions">
+            <button onClick={() => onChange("")} type="button">
+              清除
+            </button>
+            <button onClick={() => chooseDate(new Date())} type="button">
+              今天
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function toLocalTime(value: string | null): string {
   if (!value) return "";
 
@@ -259,22 +374,19 @@ export function TaskDetailDialog({
           </div>
 
           <div className="detail-field-grid">
-            <label htmlFor="task-detail-scheduled-date">
-              计划日期
-              <input
-                disabled={isSaving}
-                id="task-detail-scheduled-date"
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    scheduledDate: event.target.value,
-                    scheduledTime: event.target.value ? current.scheduledTime : "",
-                  }))
-                }
-                type="date"
-                value={draft.scheduledDate}
-              />
-            </label>
+            <DatePickerField
+              disabled={isSaving}
+              id="task-detail-scheduled-date"
+              label="计划日期"
+              onChange={(scheduledDate) =>
+                setDraft((current) => ({
+                  ...current,
+                  scheduledDate,
+                  scheduledTime: scheduledDate ? current.scheduledTime : "",
+                }))
+              }
+              value={draft.scheduledDate}
+            />
             <label htmlFor="task-detail-scheduled-time">
               具体时间（可选）
               <input
@@ -289,18 +401,13 @@ export function TaskDetailDialog({
             </label>
           </div>
 
-          <label htmlFor="task-detail-due-date">
-            截止日期
-            <input
-              disabled={isSaving}
-              id="task-detail-due-date"
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, dueDate: event.target.value }))
-              }
-              type="date"
-              value={draft.dueDate}
-            />
-          </label>
+          <DatePickerField
+            disabled={isSaving}
+            id="task-detail-due-date"
+            label="截止日期"
+            onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate }))}
+            value={draft.dueDate}
+          />
           {scheduleAfterDue ? (
             <p className="form-hint">计划日期晚于截止日期；会保留此安排并在后续视图中提示。</p>
           ) : null}
