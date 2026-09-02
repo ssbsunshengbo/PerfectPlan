@@ -3,5 +3,15 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main", "tray"],
-  "permissions": ["core:default", "sql:default", "sql:allow-execute", "notification:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:event:default",
+    "positioner:default",
+    "sql:default",
+    "sql:allow-execute",
+    "notification:default"
+  ]
 }

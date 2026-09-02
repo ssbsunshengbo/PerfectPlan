@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { emit, listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { dailyPlanService } from "../features/daily-plan/daily-plan-service";
 import { taskService } from "../features/tasks/task-service";
 import type { TaskRecord } from "../features/tasks/task-types";
@@ -66,44 +65,33 @@ export function TrayTodayPanel() {
 
   async function hidePanel() {
     try {
-      await getCurrentWindow().hide();
+      await invoke("hide_today_panel");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法隐藏面板，请重试。");
+      setError(`无法隐藏面板：${String(reason)}`);
     }
   }
 
   async function openMain() {
     try {
-      const main = await WebviewWindow.getByLabel("main");
-      await main?.show();
-      await main?.setFocus();
-      await hidePanel();
+      await invoke("open_main_from_tray");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法打开完整计划，请重试。");
+      setError(`无法打开完整计划：${String(reason)}`);
     }
   }
 
   async function quickAdd() {
     try {
-      const main = await WebviewWindow.getByLabel("main");
-      await main?.show();
-      await main?.setFocus();
-      await emit("tray-open-quick-add");
-      await hidePanel();
+      await invoke("open_quick_add_from_tray");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法新建任务，请重试。");
+      setError(`无法新建任务：${String(reason)}`);
     }
   }
 
   async function openTask(task: TaskRecord) {
     try {
-      const main = await WebviewWindow.getByLabel("main");
-      await main?.show();
-      await main?.setFocus();
-      await emit("tray-open-task", task.id);
-      await hidePanel();
+      await invoke("open_task_from_tray", { taskId: task.id });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "无法打开任务，请重试。");
+      setError(`无法打开任务：${String(reason)}`);
     }
   }
 

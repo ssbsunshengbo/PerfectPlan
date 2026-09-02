@@ -27,6 +27,12 @@ pub fn run() {
                 .add_migrations(DATABASE_CONNECTION, migrations())
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![
+            hide_today_panel,
+            open_main_from_tray,
+            open_quick_add_from_tray,
+            open_task_from_tray
+        ])
         .setup(|app| {
             let show_today = MenuItemBuilder::with_id("show-today", "显示今日计划").build(app)?;
             let open_main = MenuItemBuilder::with_id("open-main", "打开 PerfectPlan").build(app)?;
@@ -105,4 +111,37 @@ fn toggle_tray_window(app: &tauri::AppHandle) {
             show_tray_window(app);
         }
     }
+}
+
+#[tauri::command]
+fn hide_today_panel(app: tauri::AppHandle) -> Result<(), String> {
+    app.get_webview_window("tray")
+        .ok_or_else(|| "找不到今日面板窗口。".to_string())?
+        .hide()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn open_main_from_tray(app: tauri::AppHandle) -> Result<(), String> {
+    let main = app
+        .get_webview_window("main")
+        .ok_or_else(|| "找不到主窗口。".to_string())?;
+    main.unminimize().map_err(|error| error.to_string())?;
+    main.show().map_err(|error| error.to_string())?;
+    main.set_focus().map_err(|error| error.to_string())?;
+    hide_today_panel(app)
+}
+
+#[tauri::command]
+fn open_quick_add_from_tray(app: tauri::AppHandle) -> Result<(), String> {
+    open_main_from_tray(app.clone())?;
+    app.emit("tray-open-quick-add", ())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn open_task_from_tray(app: tauri::AppHandle, task_id: String) -> Result<(), String> {
+    open_main_from_tray(app.clone())?;
+    app.emit("tray-open-task", task_id)
+        .map_err(|error| error.to_string())
 }

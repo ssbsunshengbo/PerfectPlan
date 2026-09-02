@@ -3007,7 +3007,12 @@ h1 {
   min-width: 0;
   min-height: 100%;
   overflow: hidden;
-  background: transparent;
+  background: transparent !important;
+}
+html:has(.tray-today-panel),
+body:has(.tray-today-panel),
+body:has(.tray-today-panel) #root {
+  background: transparent !important;
 }
 .tray-header {
   display: flex;
