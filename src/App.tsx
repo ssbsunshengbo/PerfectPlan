@@ -1,14 +1,31 @@
-import { type CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type DragEvent,
+  FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import "./App.css";
 import { getDatabaseHealth } from "./features/database/database";
+import {
+  getCalendarTimeOptions,
+  minutesFromCalendarStartAt,
+  snapCalendarDuration,
+  snapCalendarStart,
+  toCalendarStartAt,
+  toTimeValue,
+} from "./features/calendar/calendar-scheduling";
 import { dailyPlanService } from "./features/daily-plan/daily-plan-service";
 import { projectService, type UpdateProjectInput } from "./features/projects/project-service";
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
 import type { TagRecord } from "./features/tags/tag-types";
 import { TaskDetailDialog, type TaskDetailSaveInput } from "./features/tasks/task-detail-dialog";
-import { taskService } from "./features/tasks/task-service";
+import { taskService, type UpdateTaskInput } from "./features/tasks/task-service";
 import type { RecurrenceRule, TaskPriority, TaskRecord } from "./features/tasks/task-types";
 
 type DatabaseState = "loading" | "ready" | "error";
@@ -18,13 +35,28 @@ type NavigationItem = (typeof navigationItems)[number];
 type ReversibleTaskAction = {
   kind: "created" | "completed" | "rescheduled" | "trashed";
   nextRecurringTaskId?: string | null;
-  previousSchedule?: Pick<TaskRecord, "scheduledDate" | "scheduledStartAt">;
+  previousSchedule?: Pick<TaskRecord, "scheduledDate" | "scheduledStartAt" | "estimatedMinutes">;
   rescheduleLabel?: string;
   task: Pick<TaskRecord, "id" | "title">;
 };
 
 type QuickRescheduleTarget = "tonight" | "tomorrow" | "nextWeek" | "unscheduled";
 type CalendarViewMode = "day" | "month" | "week";
+type CalendarScheduleDraft = {
+  estimatedMinutes: number;
+  isAllDay: boolean;
+  scheduledDate: string;
+  startMinutes: number;
+  task: TaskRecord;
+};
+type CalendarResizeState = {
+  date: string;
+  estimatedMinutes: number;
+  initialEstimatedMinutes: number;
+  startMinutes: number;
+  startY: number;
+  task: TaskRecord;
+};
 
 const quickRescheduleOptions: Array<{ label: string; target: QuickRescheduleTarget }> = [
   { label: "今晚", target: "tonight" },
@@ -181,6 +213,11 @@ function App() {
   const [calendarTasks, setCalendarTasks] = useState<TaskRecord[]>([]);
   const [calendarFocusTasks, setCalendarFocusTasks] = useState<TaskRecord[]>([]);
   const [calendarOverdueTasks, setCalendarOverdueTasks] = useState<TaskRecord[]>([]);
+  const [calendarScheduleDraft, setCalendarScheduleDraft] = useState<CalendarScheduleDraft | null>(
+    null,
+  );
+  const [calendarResize, setCalendarResize] = useState<CalendarResizeState | null>(null);
+  const [isSavingCalendarSchedule, setIsSavingCalendarSchedule] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInputValue, setSearchInputValue] = useState("");
@@ -278,6 +315,13 @@ function App() {
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [databaseState]);
+
+  useEffect(() => {
+    if (lastTaskAction?.kind !== "rescheduled") return;
+
+    const timeoutId = window.setTimeout(() => setLastTaskAction(null), 8_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [lastTaskAction]);
 
   async function loadInboxTasks(
     tagId = activeTagId,
@@ -426,6 +470,7 @@ function App() {
       setLastTaskAction({
         kind: "rescheduled",
         previousSchedule: {
+          estimatedMinutes: task.estimatedMinutes,
           scheduledDate: task.scheduledDate,
           scheduledStartAt: task.scheduledStartAt,
         },
@@ -768,6 +813,200 @@ function App() {
 
   function handleCalendarToday() {
     setCalendarAnchorDate(toLocalDateValue());
+  }
+
+  function openCalendarScheduleDialog(
+    task: TaskRecord,
+    scheduledDate = task.scheduledDate ?? calendarAnchorDate,
+    startMinutes = minutesFromCalendarStartAt(task.scheduledStartAt) ?? 9 * 60,
+  ) {
+    setTaskError(null);
+    setCalendarScheduleDraft({
+      estimatedMinutes: task.estimatedMinutes ?? 30,
+      isAllDay: !task.scheduledStartAt,
+      scheduledDate,
+      startMinutes: snapCalendarStart(startMinutes),
+      task,
+    });
+  }
+
+  function handleCalendarTaskKeyDown(event: ReactKeyboardEvent<HTMLElement>, task: TaskRecord) {
+    if (event.key.toLowerCase() !== "a") return;
+    event.preventDefault();
+    openCalendarScheduleDialog(task);
+  }
+
+  async function saveCalendarSchedule(
+    task: TaskRecord,
+    input: UpdateTaskInput,
+    rescheduleLabel: string,
+  ) {
+    const previousSchedule = {
+      estimatedMinutes: task.estimatedMinutes,
+      scheduledDate: task.scheduledDate,
+      scheduledStartAt: task.scheduledStartAt,
+    };
+    const nextScheduledDate =
+      "scheduledDate" in input ? (input.scheduledDate ?? null) : task.scheduledDate;
+    const nextScheduledStartAt =
+      "scheduledStartAt" in input ? (input.scheduledStartAt ?? null) : task.scheduledStartAt;
+    const nextEstimatedMinutes =
+      "estimatedMinutes" in input ? (input.estimatedMinutes ?? null) : task.estimatedMinutes;
+    const isUnchanged =
+      previousSchedule.scheduledDate === nextScheduledDate &&
+      previousSchedule.scheduledStartAt === nextScheduledStartAt &&
+      previousSchedule.estimatedMinutes === nextEstimatedMinutes;
+    if (isUnchanged) return;
+
+    setTaskError(null);
+    const updatedTask = await taskService.updateTask(task.id, input);
+    setCalendarTasks((currentTasks) =>
+      currentTasks.map((currentTask) =>
+        currentTask.id === updatedTask.id ? updatedTask : currentTask,
+      ),
+    );
+    setTasks((currentTasks) =>
+      currentTasks.map((currentTask) =>
+        currentTask.id === updatedTask.id ? updatedTask : currentTask,
+      ),
+    );
+    setLastTaskAction({
+      kind: "rescheduled",
+      previousSchedule,
+      rescheduleLabel,
+      task: { id: task.id, title: task.title },
+    });
+  }
+
+  async function handleCalendarDrop(
+    event: DragEvent<HTMLElement>,
+    scheduledDate: string,
+    startMinutes: number | null,
+  ) {
+    event.preventDefault();
+    const taskId = event.dataTransfer.getData("application/x-perfectplan-task");
+    const task = calendarTasks.find((currentTask) => currentTask.id === taskId);
+    if (!task) return;
+
+    try {
+      if (startMinutes === null) {
+        await saveCalendarSchedule(
+          task,
+          { scheduledDate, scheduledStartAt: null },
+          `${formatCalendarDay(scheduledDate)} 全天`,
+        );
+      } else {
+        const normalizedStart = snapCalendarStart(startMinutes);
+        const estimatedMinutes = snapCalendarDuration(normalizedStart, task.estimatedMinutes ?? 30);
+        await saveCalendarSchedule(
+          task,
+          {
+            estimatedMinutes,
+            scheduledDate,
+            scheduledStartAt: toCalendarStartAt(scheduledDate, normalizedStart),
+          },
+          `${formatCalendarDay(scheduledDate)} ${toTimeValue(normalizedStart)}`,
+        );
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "安排任务失败，请重试。");
+      await loadCalendarTasks();
+    }
+  }
+
+  function startCalendarDrag(event: DragEvent<HTMLElement>, task: TaskRecord) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-perfectplan-task", task.id);
+    event.dataTransfer.setData("text/plain", task.id);
+  }
+
+  function startCalendarResize(event: PointerEvent<HTMLButtonElement>, task: TaskRecord) {
+    const startMinutes = minutesFromCalendarStartAt(task.scheduledStartAt);
+    if (!task.scheduledDate || startMinutes === null) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const initialEstimatedMinutes = task.estimatedMinutes ?? 30;
+    setCalendarResize({
+      date: task.scheduledDate,
+      estimatedMinutes: initialEstimatedMinutes,
+      initialEstimatedMinutes,
+      startMinutes,
+      startY: event.clientY,
+      task,
+    });
+  }
+
+  function updateCalendarResize(event: PointerEvent<HTMLButtonElement>) {
+    if (!calendarResize) return;
+    const distance = event.clientY - calendarResize.startY;
+    setCalendarResize((currentResize) =>
+      currentResize
+        ? {
+            ...currentResize,
+            estimatedMinutes: snapCalendarDuration(
+              currentResize.startMinutes,
+              currentResize.initialEstimatedMinutes + distance,
+            ),
+          }
+        : null,
+    );
+  }
+
+  function endCalendarResize(event: PointerEvent<HTMLButtonElement>) {
+    if (!calendarResize) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    const resize = calendarResize;
+    setCalendarResize(null);
+    if (resize.estimatedMinutes === resize.initialEstimatedMinutes) return;
+
+    void saveCalendarSchedule(
+      resize.task,
+      { estimatedMinutes: resize.estimatedMinutes },
+      `时长 ${resize.estimatedMinutes} 分钟`,
+    ).catch(async (error) => {
+      setTaskError(error instanceof Error ? error.message : "调整时长失败，请重试。");
+      await loadCalendarTasks();
+    });
+  }
+
+  async function handleSaveCalendarSchedule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!calendarScheduleDraft) return;
+
+    setIsSavingCalendarSchedule(true);
+    try {
+      const { estimatedMinutes, isAllDay, scheduledDate, startMinutes, task } =
+        calendarScheduleDraft;
+      if (isAllDay) {
+        await saveCalendarSchedule(
+          task,
+          { scheduledDate, scheduledStartAt: null },
+          `${formatCalendarDay(scheduledDate)} 全天`,
+        );
+      } else {
+        const normalizedStart = snapCalendarStart(startMinutes);
+        const normalizedDuration = snapCalendarDuration(normalizedStart, estimatedMinutes);
+        await saveCalendarSchedule(
+          task,
+          {
+            estimatedMinutes: normalizedDuration,
+            scheduledDate,
+            scheduledStartAt: toCalendarStartAt(scheduledDate, normalizedStart),
+          },
+          `${formatCalendarDay(scheduledDate)} ${toTimeValue(normalizedStart)}`,
+        );
+      }
+      setCalendarScheduleDraft(null);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "安排任务失败，请重试。");
+      await loadCalendarTasks();
+    } finally {
+      setIsSavingCalendarSchedule(false);
+    }
   }
 
   async function handleAddFocusTask(task: TaskRecord) {
@@ -1661,6 +1900,8 @@ function App() {
                             isCurrentMonth ? "calendar-month-day" : "calendar-month-day is-outside"
                           }
                           key={date}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => void handleCalendarDrop(event, date, null)}
                         >
                           <button
                             aria-label={`查看${formatCalendarDay(date)}`}
@@ -1678,8 +1919,11 @@ function App() {
                           {scheduledTasks.slice(0, 3).map((task) => (
                             <button
                               className="calendar-month-task"
+                              draggable
                               key={task.id}
                               onClick={() => void openTaskDetails(task)}
+                              onDragStart={(event) => startCalendarDrag(event, task)}
+                              onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
                               style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                               type="button"
                             >
@@ -1766,13 +2010,21 @@ function App() {
                       const allDayTasks = calendarAllDayTasksByDate.get(date) ?? [];
 
                       return (
-                        <div className="calendar-all-day-cell" key={date}>
+                        <div
+                          className="calendar-all-day-cell"
+                          key={date}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => void handleCalendarDrop(event, date, null)}
+                        >
                           {allDayTasks.length > 0 ? (
                             allDayTasks.map((task) => (
                               <button
                                 className="calendar-all-day-task"
+                                draggable
                                 key={task.id}
                                 onClick={() => void openTaskDetails(task)}
+                                onDragStart={(event) => startCalendarDrag(event, task)}
+                                onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
                                 style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                                 type="button"
                               >
@@ -1807,7 +2059,19 @@ function App() {
                         const timedTasks = calendarTimedTasksByDate.get(date) ?? [];
 
                         return (
-                          <div className="calendar-time-column" key={date}>
+                          <div
+                            className="calendar-time-column"
+                            key={date}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={(event) => {
+                              const bounds = event.currentTarget.getBoundingClientRect();
+                              void handleCalendarDrop(
+                                event,
+                                date,
+                                event.clientY - bounds.top + 360,
+                              );
+                            }}
+                          >
                             {timedTasks.map((task) => {
                               const estimatedMinutes = task.estimatedMinutes ?? 30;
                               const offsetMinutes = calendarTimeOffset(task.scheduledStartAt);
@@ -1818,28 +2082,50 @@ function App() {
                               );
 
                               return (
-                                <button
-                                  aria-label={`${formatCalendarTime(task.scheduledStartAt)}，${task.title}`}
+                                <div
                                   className={
                                     isAfterDue
                                       ? "calendar-time-task is-after-due"
                                       : "calendar-time-task"
                                   }
+                                  draggable={calendarResize?.task.id !== task.id}
                                   key={task.id}
-                                  onClick={() => void openTaskDetails(task)}
+                                  onDragStart={(event) => startCalendarDrag(event, task)}
                                   style={
                                     {
                                       "--task-color": calendarTaskColor(task),
-                                      height: `${Math.max(estimatedMinutes, 30)}px`,
+                                      height: `${Math.max(
+                                        calendarResize?.task.id === task.id
+                                          ? calendarResize.estimatedMinutes
+                                          : estimatedMinutes,
+                                        30,
+                                      )}px`,
                                       top: `${offsetMinutes}px`,
                                     } as CSSProperties
                                   }
-                                  type="button"
                                 >
-                                  <span>{formatCalendarTime(task.scheduledStartAt)}</span>
-                                  <strong>{task.title}</strong>
-                                  <small>{`${estimatedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}`}</small>
-                                </button>
+                                  <button
+                                    aria-keyshortcuts="A"
+                                    aria-label={`${formatCalendarTime(task.scheduledStartAt)}，${task.title}；按 A 可安排到其他时间`}
+                                    className="calendar-time-task-main"
+                                    onClick={() => void openTaskDetails(task)}
+                                    onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
+                                    type="button"
+                                  >
+                                    <span>{formatCalendarTime(task.scheduledStartAt)}</span>
+                                    <strong>{task.title}</strong>
+                                    <small>{`${calendarResize?.task.id === task.id ? calendarResize.estimatedMinutes : estimatedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}`}</small>
+                                  </button>
+                                  <button
+                                    aria-label={`拉伸「${task.title}」的时长`}
+                                    className="calendar-resize-handle"
+                                    onPointerCancel={() => setCalendarResize(null)}
+                                    onPointerDown={(event) => startCalendarResize(event, task)}
+                                    onPointerMove={updateCalendarResize}
+                                    onPointerUp={endCalendarResize}
+                                    type="button"
+                                  />
+                                </div>
                               );
                             })}
                           </div>
@@ -1854,7 +2140,7 @@ function App() {
                 <div>
                   <p className="eyebrow">待安排</p>
                   <h3 id="calendar-candidates-title">先决定放在哪天</h3>
-                  <p>拖入日历将在下一步开放；现在可打开详情安排日期与时间。</p>
+                  <p>拖到日期安排全天，拖到时间网格安排具体时间；按 A 也可键盘安排。</p>
                 </div>
                 {calendarCandidateTasks.length > 0 ? (
                   <ul>
@@ -1869,8 +2155,12 @@ function App() {
                       return (
                         <li key={task.id}>
                           <button
+                            aria-keyshortcuts="A"
                             className="calendar-candidate-task"
+                            draggable
                             onClick={() => void openTaskDetails(task)}
+                            onDragStart={(event) => startCalendarDrag(event, task)}
+                            onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
                             style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                             type="button"
                           >
@@ -2294,6 +2584,149 @@ function App() {
                 </button>
                 <button className="primary-button" disabled={isSavingTask} type="submit">
                   {isSavingTask ? "正在保存…" : "添加任务"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {calendarScheduleDraft ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="calendar-schedule-description"
+            aria-labelledby="calendar-schedule-title"
+            aria-modal="true"
+            className="calendar-schedule-dialog"
+            role="dialog"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !isSavingCalendarSchedule) {
+                setCalendarScheduleDraft(null);
+                setTaskError(null);
+              }
+            }}
+          >
+            <div className="quick-add-header">
+              <div>
+                <p className="eyebrow">时间安排</p>
+                <h2 id="calendar-schedule-title">安排「{calendarScheduleDraft.task.title}」</h2>
+              </div>
+              <button
+                aria-label="关闭安排任务窗口"
+                className="icon-button"
+                disabled={isSavingCalendarSchedule}
+                onClick={() => setCalendarScheduleDraft(null)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <p id="calendar-schedule-description">
+              选择全天，或为任务指定开始时间与预计时长。所有时间均按本机时区保存。
+            </p>
+            <form
+              className="calendar-schedule-form"
+              onSubmit={(event) => void handleSaveCalendarSchedule(event)}
+            >
+              <label>
+                日期
+                <input
+                  disabled={isSavingCalendarSchedule}
+                  onChange={(event) =>
+                    setCalendarScheduleDraft((current) =>
+                      current ? { ...current, scheduledDate: event.target.value } : null,
+                    )
+                  }
+                  required
+                  type="date"
+                  value={calendarScheduleDraft.scheduledDate}
+                />
+              </label>
+              <div aria-label="安排方式" className="calendar-schedule-mode">
+                <button
+                  aria-pressed={calendarScheduleDraft.isAllDay}
+                  disabled={isSavingCalendarSchedule}
+                  onClick={() =>
+                    setCalendarScheduleDraft((current) =>
+                      current ? { ...current, isAllDay: true } : null,
+                    )
+                  }
+                  type="button"
+                >
+                  全天
+                </button>
+                <button
+                  aria-pressed={!calendarScheduleDraft.isAllDay}
+                  disabled={isSavingCalendarSchedule}
+                  onClick={() =>
+                    setCalendarScheduleDraft((current) =>
+                      current ? { ...current, isAllDay: false } : null,
+                    )
+                  }
+                  type="button"
+                >
+                  具体时间
+                </button>
+              </div>
+              {!calendarScheduleDraft.isAllDay ? (
+                <div className="calendar-schedule-grid">
+                  <label>
+                    开始时间
+                    <select
+                      disabled={isSavingCalendarSchedule}
+                      onChange={(event) =>
+                        setCalendarScheduleDraft((current) =>
+                          current ? { ...current, startMinutes: Number(event.target.value) } : null,
+                        )
+                      }
+                      value={calendarScheduleDraft.startMinutes}
+                    >
+                      {getCalendarTimeOptions().map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    预计时长（分钟）
+                    <input
+                      disabled={isSavingCalendarSchedule}
+                      max={24 * 60 - calendarScheduleDraft.startMinutes}
+                      min={30}
+                      onChange={(event) =>
+                        setCalendarScheduleDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                estimatedMinutes: Number(event.target.value) || 30,
+                              }
+                            : null,
+                        )
+                      }
+                      step={15}
+                      type="number"
+                      value={calendarScheduleDraft.estimatedMinutes}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {taskError ? <p className="form-error">{taskError}</p> : null}
+              <div className="dialog-actions">
+                <button
+                  className="secondary-button"
+                  disabled={isSavingCalendarSchedule}
+                  onClick={() => setCalendarScheduleDraft(null)}
+                  type="button"
+                >
+                  取消
+                </button>
+                <button
+                  className="primary-button"
+                  disabled={isSavingCalendarSchedule}
+                  type="submit"
+                >
+                  {isSavingCalendarSchedule ? "正在保存…" : "保存安排"}
                 </button>
               </div>
             </form>

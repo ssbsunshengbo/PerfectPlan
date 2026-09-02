@@ -687,6 +687,7 @@ h1 {
 .calendar-view {
   display: grid;
   align-content: start;
+  container-type: inline-size;
   width: min(100%, 1260px);
   gap: 16px;
 }
@@ -975,14 +976,12 @@ h1 {
   left: 5px;
   right: 5px;
   min-height: 30px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid color-mix(in srgb, var(--task-color) 38%, transparent);
   border-left: 3px solid var(--task-color);
   border-radius: 8px;
   background: color-mix(in srgb, var(--task-color) 13%, var(--panel));
-  padding: 5px 6px;
-  color: var(--ink);
-  text-align: left;
+  cursor: grab;
 }
 .calendar-time-task:hover {
   z-index: 2;
@@ -994,14 +993,27 @@ h1 {
   border-right-color: #d7a75a;
   border-bottom-color: #d7a75a;
 }
-.calendar-time-task > span,
-.calendar-time-task small {
+.calendar-time-task-main {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 5px 6px;
+  color: var(--ink);
+  cursor: inherit;
+  text-align: left;
+}
+.calendar-time-task-main > span,
+.calendar-time-task-main small {
   display: block;
   color: var(--faint);
   font-size: 9px;
   line-height: 1.25;
 }
-.calendar-time-task strong {
+.calendar-time-task-main strong {
   display: block;
   overflow: hidden;
   color: var(--ink);
@@ -1010,6 +1022,37 @@ h1 {
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.calendar-resize-handle {
+  position: absolute;
+  right: 7px;
+  bottom: -4px;
+  left: 7px;
+  height: 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: ns-resize;
+}
+.calendar-resize-handle::after {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  left: 0;
+  height: 2px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--task-color) 70%, #fff);
+  content: "";
+  opacity: 0;
+}
+.calendar-time-task:hover .calendar-resize-handle::after,
+.calendar-resize-handle:focus-visible::after {
+  opacity: 1;
+}
+.calendar-candidate-task[draggable="true"],
+.calendar-all-day-task[draggable="true"],
+.calendar-month-task[draggable="true"] {
+  cursor: grab;
 }
 .calendar-candidates {
   position: sticky;
@@ -1038,6 +1081,76 @@ h1 {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.55;
+}
+
+.calendar-schedule-dialog {
+  width: min(100%, 500px);
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: 0 30px 90px rgb(24 41 33 / 24%);
+  padding: 26px;
+}
+.calendar-schedule-dialog > p {
+  margin: -7px 0 20px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.calendar-schedule-form {
+  display: grid;
+  gap: 15px;
+}
+.calendar-schedule-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 720;
+}
+.calendar-schedule-form input,
+.calendar-schedule-form select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #cad7ce;
+  border-radius: 9px;
+  background: #fff;
+  padding: 8px 10px;
+  color: var(--ink);
+}
+.calendar-schedule-form input:focus,
+.calendar-schedule-form select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(39 101 79 / 12%);
+  outline: 0;
+}
+.calendar-schedule-mode {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel-soft);
+  padding: 4px;
+}
+.calendar-schedule-mode button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 750;
+}
+.calendar-schedule-mode button[aria-pressed="true"] {
+  background: var(--panel);
+  box-shadow: 0 2px 7px rgb(35 53 44 / 10%);
+  color: var(--accent-deep);
+}
+.calendar-schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 .calendar-candidates ul {
   display: grid;
@@ -2217,6 +2330,15 @@ h1 {
   }
 }
 @media (max-width: 1180px) {
+  .calendar-layout {
+    grid-template-columns: 1fr;
+  }
+  .calendar-candidates {
+    position: static;
+    max-height: none;
+  }
+}
+@container (max-width: 960px) {
   .calendar-layout {
     grid-template-columns: 1fr;
   }
