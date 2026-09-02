@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { moveWindow, Position } from "@tauri-apps/plugin-positioner";
@@ -16,6 +17,8 @@ function localDate() {
 export function TrayTodayPanel() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const today = localDate();
 
   const load = useCallback(async () => {
@@ -38,67 +41,124 @@ export function TrayTodayPanel() {
   }, [today]);
 
   useEffect(() => {
-    void moveWindow(Position.TrayCenter).catch(() => undefined);
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen("tray-show-today", () => {
+      setError(null);
+      void moveWindow(Position.TrayCenter).catch(() => undefined);
+      void load();
+    }).then((stop) => {
+      unlisten = stop;
+      // The initial event can arrive while this hidden window is loading.
+      void moveWindow(Position.TrayCenter).catch(() => undefined);
+    });
+    return () => unlisten?.();
+  }, [load]);
+
+  async function hidePanel() {
+    await getCurrentWindow().hide();
+  }
 
   async function openMain() {
     const main = await WebviewWindow.getByLabel("main");
     await main?.show();
     await main?.setFocus();
-    await getCurrentWindow().hide();
+    await hidePanel();
+  }
+
+  async function quickAdd() {
+    const main = await WebviewWindow.getByLabel("main");
+    await main?.show();
+    await main?.setFocus();
+    await emit("tray-open-quick-add");
+    await hidePanel();
+  }
+
+  async function openTask(task: TaskRecord) {
+    const main = await WebviewWindow.getByLabel("main");
+    await main?.show();
+    await main?.setFocus();
+    await emit("tray-open-task", task.id);
+    await hidePanel();
   }
 
   async function complete(task: TaskRecord) {
-    await taskService.completeTask(task.id);
-    await load();
+    setUpdatingTaskId(task.id);
+    setError(null);
+    try {
+      await taskService.completeTask(task.id);
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法完成任务，请重试。");
+    } finally {
+      setUpdatingTaskId(null);
+    }
   }
 
   return (
     <main className="tray-today-panel">
-      <header>
-        <div>
-          <p>PERFECTPLAN</p>
-          <h1>今天</h1>
+      <header className="tray-header">
+        <div className="tray-heading">
+          <span className="tray-mark" aria-hidden="true">
+            ✓
+          </span>
+          <div>
+            <p className="tray-date">
+              {new Intl.DateTimeFormat("zh-CN", {
+                month: "long",
+                day: "numeric",
+                weekday: "long",
+              }).format(new Date())}
+            </p>
+            <h1>今天</h1>
+          </div>
         </div>
         <button
           aria-label="隐藏今日面板"
-          onClick={() => void getCurrentWindow().hide()}
+          className="tray-close"
+          onClick={() => void hidePanel()}
           type="button"
         >
           ×
         </button>
       </header>
-      <p className="tray-date">
-        {new Intl.DateTimeFormat("zh-CN", {
-          month: "long",
-          day: "numeric",
-          weekday: "long",
-        }).format(new Date())}
-      </p>
+      <section className="tray-summary" aria-label="今日任务摘要">
+        <strong>{isLoading ? "—" : tasks.length}</strong>
+        <span>项待完成</span>
+      </section>
       {isLoading ? (
         <p className="tray-empty">正在读取今日计划…</p>
       ) : tasks.length ? (
-        <ul>
+        <ul className="tray-task-list">
           {tasks.slice(0, 6).map((task) => (
             <li key={task.id}>
               <button
                 aria-label={`完成任务：${task.title}`}
                 className="tray-complete"
                 onClick={() => void complete(task)}
+                disabled={updatingTaskId === task.id}
                 type="button"
               />
-              <span>{task.title}</span>
+              <button className="tray-task-title" onClick={() => void openTask(task)} type="button">
+                {task.title}
+              </button>
             </li>
           ))}
         </ul>
       ) : (
         <p className="tray-empty">今天没有待完成任务。</p>
       )}
+      {error ? <p className="tray-error">{error}</p> : null}
       <footer>
-        <button onClick={() => void openMain()} type="button">
-          打开完整计划 <span>↗</span>
+        <button className="tray-new-task" onClick={() => void quickAdd()} type="button">
+          <span aria-hidden="true">＋</span> 新建任务
+        </button>
+        <button className="tray-open-main" onClick={() => void openMain()} type="button">
+          打开完整计划 <span aria-hidden="true">↗</span>
         </button>
       </footer>
     </main>

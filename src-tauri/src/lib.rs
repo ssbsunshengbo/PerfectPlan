@@ -59,7 +59,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        show_tray_window(tray.app_handle());
+                        toggle_tray_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -89,5 +89,18 @@ fn show_tray_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("tray") {
         let _ = window.show();
         let _ = window.set_focus();
+        // The positioner receives the native tray event above. Notify the webview
+        // only after it becomes visible so it can place itself beside that event.
+        let _ = app.emit("tray-show-today", ());
+    }
+}
+
+fn toggle_tray_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("tray") {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.hide();
+        } else {
+            show_tray_window(app);
+        }
     }
 }

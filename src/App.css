@@ -2988,99 +2988,187 @@ h1 {
 }
 
 .tray-today-panel {
+  box-sizing: border-box;
   min-height: 100vh;
-  padding: 20px;
-  color: var(--ink);
-  background: #fff;
+  padding: 18px;
+  overflow: hidden;
+  color: #20252f;
+  background: #fbfbfc;
 }
-.tray-today-panel header {
+.tray-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
 }
-.tray-today-panel header p {
-  margin: 0 0 4px;
-  color: var(--accent);
-  font-size: 9px;
+.tray-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tray-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: #276ef1;
+  color: #fff;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: 0.12em;
+}
+.tray-date {
+  margin: 0 0 2px;
+  color: #7a8190;
+  font-size: 11px;
+  font-weight: 550;
 }
 .tray-today-panel h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 19px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
 }
-.tray-today-panel header > button {
+.tray-close {
+  display: grid;
   width: 28px;
   height: 28px;
-  border: 0;
-  border-radius: 6px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
   background: transparent;
-  color: var(--muted);
-  font-size: 22px;
+  color: #7a8190;
+  font-size: 20px;
   line-height: 1;
 }
-.tray-today-panel header > button:hover {
-  background: var(--panel-soft);
+.tray-close:hover {
+  border-color: #e3e6eb;
+  background: #f0f2f5;
+  color: #343b48;
 }
-.tray-date {
-  margin: 4px 0 18px;
-  color: var(--muted);
+.tray-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 16px 0 12px;
+  padding: 13px 14px;
+  border: 1px solid #e8eaf0;
+  border-radius: 12px;
+  background: linear-gradient(130deg, #f5f8ff 0%, #ffffff 80%);
+}
+.tray-summary strong {
+  color: #276ef1;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.tray-summary span {
+  color: #6f7785;
   font-size: 12px;
 }
-.tray-today-panel ul {
+.tray-task-list {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.tray-today-panel li {
+.tray-task-list li {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 38px;
-  border-radius: 7px;
-  padding: 5px 7px;
-  font-size: 13px;
+  min-height: 39px;
+  padding: 3px 7px;
+  border-radius: 9px;
 }
-.tray-today-panel li:hover {
-  background: #f6f8ff;
+.tray-task-list li:hover {
+  background: #f1f4f9;
 }
 .tray-complete {
   width: 17px;
   height: 17px;
   flex: 0 0 auto;
-  border: 1.5px solid #b9bec6;
+  border: 1.5px solid #b5bdca;
   border-radius: 50%;
-  background: #fff;
+  background: transparent;
+  cursor: pointer;
 }
 .tray-complete:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: #276ef1;
+  background: #276ef1;
+  box-shadow: inset 0 0 0 3px #f1f4f9;
+}
+.tray-complete:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+.tray-task-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: #2d3440;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 540;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tray-task-title:hover {
+  color: #165edc;
 }
 .tray-empty {
-  margin: 35px 0;
-  color: var(--muted);
+  margin: 27px 0;
+  color: #7a8190;
   font-size: 13px;
   text-align: center;
 }
+.tray-error {
+  margin: 8px 0;
+  color: #bb3737;
+  font-size: 11px;
+}
 .tray-today-panel footer {
   position: absolute;
-  right: 20px;
-  bottom: 18px;
-  left: 20px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
+  right: 18px;
+  bottom: 16px;
+  left: 18px;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 8px;
+  padding-top: 13px;
+  border-top: 1px solid #e8eaf0;
 }
 .tray-today-panel footer button {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--accent-deep);
+  height: 34px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
-  text-align: left;
+  cursor: pointer;
+}
+.tray-new-task {
+  border: 1px solid #dfe4ec;
+  background: #fff;
+  color: #475161;
+}
+.tray-new-task:hover {
+  border-color: #b9cef7;
+  background: #f6f9ff;
+  color: #165edc;
+}
+.tray-open-main {
+  border: 1px solid #276ef1;
+  background: #276ef1;
+  color: #fff;
+}
+.tray-open-main:hover {
+  border-color: #165edc;
+  background: #165edc;
 }
 .tray-today-panel footer span {
-  float: right;
+  margin-right: 2px;
 }

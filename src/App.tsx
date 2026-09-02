@@ -325,11 +325,21 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
+    let stopQuickAdd: (() => void) | undefined;
+    let stopOpenTask: (() => void) | undefined;
     void listen("tray-open-quick-add", () => setIsQuickAddOpen(true)).then((stop) => {
-      unlisten = stop;
+      stopQuickAdd = stop;
     });
-    return () => unlisten?.();
+    void listen<string>("tray-open-task", async (event) => {
+      const task = await taskService.getTask(event.payload);
+      if (task) await openTaskDetails(task);
+    }).then((stop) => {
+      stopOpenTask = stop;
+    });
+    return () => {
+      stopQuickAdd?.();
+      stopOpenTask?.();
+    };
   }, []);
 
   useEffect(() => {
