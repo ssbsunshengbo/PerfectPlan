@@ -262,12 +262,80 @@ h1 {
 
 .empty-state,
 .task-list,
-.project-list {
+.project-list,
+.app-state-panel {
   width: min(100%, 1040px);
   border: 1px solid var(--line);
   border-radius: 22px;
   background: rgb(255 254 250 / 88%);
   box-shadow: var(--shadow);
+}
+.app-state-panel {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 260px;
+  padding: 38px;
+}
+.app-state-panel > div {
+  display: grid;
+  gap: 8px;
+  max-width: 560px;
+}
+.app-state-panel .eyebrow {
+  margin: 0;
+}
+.app-state-panel h2 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 23px;
+  letter-spacing: -0.03em;
+}
+.app-state-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.app-state-panel .state-help {
+  color: var(--faint);
+  font-size: 12px;
+}
+.app-state-panel .primary-button {
+  justify-self: start;
+  margin-top: 5px;
+}
+.app-state-panel.is-error {
+  border-color: #f0c5c0;
+  background: linear-gradient(135deg, #fff9f8, #fffefa);
+}
+.app-state-panel.is-compact {
+  min-height: 185px;
+}
+.state-icon,
+.state-spinner {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  place-items: center;
+  border-radius: 16px;
+}
+.state-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 24px;
+  font-weight: 800;
+}
+.state-spinner {
+  border: 3px solid #dbe9df;
+  border-top-color: var(--accent);
+  animation: plan-spin 0.85s linear infinite;
+}
+@keyframes plan-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 .empty-state {
   display: grid;
@@ -1589,6 +1657,10 @@ h1 {
 }
 
 .task-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   align-self: start;
   width: min(100%, 720px);
   margin: -14px 0 0;
@@ -1598,6 +1670,17 @@ h1 {
   padding: 9px 11px;
   color: var(--danger);
   font-size: 12px;
+}
+.task-error button {
+  flex: none;
+  border: 0;
+  border-radius: 7px;
+  background: rgb(186 78 67 / 13%);
+  padding: 5px 7px;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
 }
 .undo-toast {
   display: flex;
@@ -2660,7 +2743,8 @@ h1 {
   }
   .task-list,
   .project-list,
-  .empty-state {
+  .empty-state,
+  .app-state-panel {
     background: rgb(32 44 39 / 90%);
   }
   .task-filter-controls,

@@ -9,6 +9,10 @@ export type DatabaseHealth = {
 
 let databasePromise: Promise<Database> | undefined;
 
+export function resetDatabaseConnection(): void {
+  databasePromise = undefined;
+}
+
 export async function getDatabase(): Promise<Database> {
   databasePromise ??= Database.load(DATABASE_CONNECTION);
 

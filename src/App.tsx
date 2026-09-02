@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import "./App.css";
-import { getDatabaseHealth } from "./features/database/database";
+import { getDatabaseHealth, resetDatabaseConnection } from "./features/database/database";
 import {
   CALENDAR_OVERLOAD_MINUTES,
   getCalendarConflictTaskIds,
@@ -226,6 +226,9 @@ function formatUpcomingDay(localDate: string): { day: string; weekday: string } 
 function App() {
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
   const [databaseMessage, setDatabaseMessage] = useState("正在准备本地数据库…");
+  const [databaseAttempt, setDatabaseAttempt] = useState(0);
+  const [isRetryingDatabase, setIsRetryingDatabase] = useState(false);
+  const [isViewLoading, setIsViewLoading] = useState(false);
   const [activeView, setActiveView] = useState<NavigationItem>("收集箱");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
@@ -325,13 +328,15 @@ function App() {
             ? `无法打开本地数据库：${error.message}`
             : "无法打开本地数据库。请检查磁盘空间后重试。",
         );
+      } finally {
+        if (isMounted) setIsRetryingDatabase(false);
       }
     })();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [databaseAttempt]);
 
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
@@ -416,6 +421,15 @@ function App() {
       tagId: tagId ?? undefined,
     });
     setTasks(activeTasks);
+  }
+
+  function handleRetryDatabase() {
+    resetDatabaseConnection();
+    setTaskError(null);
+    setDatabaseState("loading");
+    setDatabaseMessage("正在重新连接本地数据库…");
+    setIsRetryingDatabase(true);
+    setDatabaseAttempt((current) => current + 1);
   }
 
   async function loadTodayTasks() {
@@ -923,6 +937,7 @@ function App() {
   async function handleNavigation(item: NavigationItem) {
     setActiveView(item);
     setTaskError(null);
+    setIsViewLoading(true);
 
     try {
       if (item === "收集箱") await loadInboxTasks();
@@ -932,6 +947,8 @@ function App() {
       if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
+    } finally {
+      setIsViewLoading(false);
     }
   }
 
@@ -939,11 +956,14 @@ function App() {
     const nextStartDate = addDays(upcomingStartDate, days);
     setUpcomingStartDate(nextStartDate);
     setTaskError(null);
+    setIsViewLoading(true);
 
     try {
       await loadUpcomingTasks(nextStartDate);
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取即将到来的任务，请重试。");
+    } finally {
+      setIsViewLoading(false);
     }
   }
 
@@ -951,11 +971,14 @@ function App() {
     const today = toLocalDateValue();
     setUpcomingStartDate(today);
     setTaskError(null);
+    setIsViewLoading(true);
 
     try {
       await loadUpcomingTasks(today);
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取即将到来的任务，请重试。");
+    } finally {
+      setIsViewLoading(false);
     }
   }
 
@@ -1471,6 +1494,7 @@ function App() {
               <li key={item}>
                 <button
                   className={item === activeView ? "nav-item is-active" : "nav-item"}
+                  disabled={databaseState !== "ready"}
                   onClick={() => void handleNavigation(item)}
                   type="button"
                 >
@@ -1484,6 +1508,7 @@ function App() {
         <button
           aria-keyshortcuts="Control+K Meta+K"
           className="command-button"
+          disabled={databaseState !== "ready"}
           onClick={() => {
             setActiveView("收集箱");
             window.requestAnimationFrame(() => searchInputRef.current?.focus());
@@ -1522,7 +1547,54 @@ function App() {
           </button>
         </header>
 
-        {isUpcoming ? (
+        {databaseState === "loading" ? (
+          <section aria-busy="true" aria-live="polite" className="app-state-panel is-loading">
+            <span aria-hidden="true" className="state-spinner" />
+            <div>
+              <p className="eyebrow">本地优先</p>
+              <h2>正在打开你的计划</h2>
+              <p>任务、项目和标签只会从当前设备读取。</p>
+            </div>
+          </section>
+        ) : databaseState === "error" ? (
+          <section
+            aria-labelledby="database-error-title"
+            className="app-state-panel is-error"
+            role="alert"
+          >
+            <span aria-hidden="true" className="state-icon">
+              !
+            </span>
+            <div>
+              <p className="eyebrow">本地数据库不可用</p>
+              <h2 id="database-error-title">暂时无法打开你的计划</h2>
+              <p>{databaseMessage}</p>
+              <p className="state-help">
+                请先重试；若仍失败，重启应用并确认磁盘空间充足。现有数据不会因重试而被删除。
+              </p>
+              <button
+                className="primary-button"
+                disabled={isRetryingDatabase}
+                onClick={handleRetryDatabase}
+                type="button"
+              >
+                {isRetryingDatabase ? "正在重试…" : "重新连接"}
+              </button>
+            </div>
+          </section>
+        ) : isViewLoading ? (
+          <section
+            aria-busy="true"
+            aria-live="polite"
+            className="app-state-panel is-loading is-compact"
+          >
+            <span aria-hidden="true" className="state-spinner" />
+            <div>
+              <h2>正在更新{activeView}</h2>
+              <p>请稍候，数据仍保留在本机。</p>
+            </div>
+          </section>
+        ) : isUpcoming ? (
           <section aria-labelledby="upcoming-view-title" className="upcoming-view">
             <div className="upcoming-toolbar">
               <div>
@@ -2693,9 +2765,14 @@ function App() {
         )}
 
         {taskError ? (
-          <p className="task-error" role="alert">
-            {taskError}
-          </p>
+          <div className="task-error" role="alert">
+            <span>{taskError}</span>
+            {databaseState === "ready" ? (
+              <button onClick={() => void handleNavigation(activeView)} type="button">
+                再试一次
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {lastTaskAction ? (
