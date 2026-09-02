@@ -201,6 +201,35 @@ describe("taskService", () => {
     expect(execute.mock.calls[0]?.[0]).toContain("scheduled_start_at = $4");
   });
 
+  it("rejects a time block that would cross into the next local day", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+    const startAt = new Date(2026, 8, 3, 23, 30).toISOString();
+
+    await expect(
+      taskService.updateTask("task-1", {
+        estimatedMinutes: 60,
+        scheduledDate: "2026-09-03",
+        scheduledStartAt: startAt,
+      }),
+    ).rejects.toThrow("计划时长不能跨越到下一天");
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("rejects a scheduled timestamp that falls outside its local plan date", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+    const startAt = new Date(2026, 8, 4, 0, 30).toISOString();
+
+    await expect(
+      taskService.updateTask("task-1", {
+        scheduledDate: "2026-09-03",
+        scheduledStartAt: startAt,
+      }),
+    ).rejects.toThrow("计划开始时间必须位于所选计划日期内");
+
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("creates a one-level subtask that inherits its parent project", async () => {
     select
       .mockResolvedValueOnce([{ ...taskRow, project_id: "project-1" }])

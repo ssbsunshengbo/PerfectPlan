@@ -136,6 +136,35 @@ function normalizeEstimatedMinutes(value: number | null | undefined): number | n
   return value;
 }
 
+function toLocalDateValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
+function validateTaskSchedule(
+  scheduledDate: string | null,
+  scheduledStartAt: string | null,
+  estimatedMinutes: number | null,
+): void {
+  if (!scheduledStartAt) return;
+  if (!scheduledDate) throw new Error("设置计划开始时间前，请先选择计划日期");
+
+  const start = new Date(scheduledStartAt);
+  if (toLocalDateValue(start) !== scheduledDate) {
+    throw new Error("计划开始时间必须位于所选计划日期内");
+  }
+  if (!estimatedMinutes) return;
+
+  const [year, month, day] = scheduledDate.split("-").map(Number);
+  const nextDayStart = new Date(year ?? 0, (month ?? 1) - 1, (day ?? 1) + 1).getTime();
+  const endAt = start.getTime() + estimatedMinutes * 60_000;
+
+  if (endAt > nextDayStart) {
+    throw new Error("计划时长不能跨越到下一天");
+  }
+}
+
 function toTaskStatus(status: string): TaskStatus {
   if (!taskStatuses.includes(status as TaskStatus)) {
     throw new Error(`数据库中存在未知任务状态：${status}`);
@@ -453,11 +482,17 @@ export const taskService = {
         ? normalizeScheduledStartAt(input.scheduledStartAt)
         : existingTask.scheduledStartAt;
 
-    if (nextScheduledStartAt && !nextScheduledDate) {
-      throw new Error("设置计划开始时间前，请先选择计划日期");
-    }
+    const clearsScheduledStartAt =
+      "scheduledDate" in input && nextScheduledDate === null && !("scheduledStartAt" in input);
+    const effectiveScheduledStartAt = clearsScheduledStartAt ? null : nextScheduledStartAt;
+    const nextEstimatedMinutes =
+      "estimatedMinutes" in input
+        ? normalizeEstimatedMinutes(input.estimatedMinutes)
+        : existingTask.estimatedMinutes;
 
-    if ("scheduledDate" in input && nextScheduledDate === null && !("scheduledStartAt" in input)) {
+    validateTaskSchedule(nextScheduledDate, effectiveScheduledStartAt, nextEstimatedMinutes);
+
+    if (clearsScheduledStartAt) {
       updates.push({ column: "scheduled_start_at", value: null });
     }
 

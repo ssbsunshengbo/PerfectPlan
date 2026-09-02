@@ -42,6 +42,13 @@ const priorityOptions: Array<{ label: string; value: TaskPriority }> = [
 ];
 
 const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
+const durationPresets = [30, 45, 60, 90, 120];
+const timeOptions = Array.from({ length: 94 }, (_, index) => {
+  const totalMinutes = index * 15;
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(
+    totalMinutes % 60,
+  ).padStart(2, "0")}`;
+});
 
 function toDateValue(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -224,6 +231,116 @@ function DatePickerField({
   );
 }
 
+function TimePickerField({
+  disabled,
+  id,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  id: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="time-picker-field">
+      <span id={`${id}-label`}>具体时间（可选）</span>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        aria-labelledby={`${id}-label`}
+        className={value ? "date-picker-trigger has-value" : "date-picker-trigger"}
+        disabled={disabled}
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>{value || "全天，不设具体时间"}</span>
+        <span aria-hidden="true">⌄</span>
+      </button>
+      {isOpen ? (
+        <div aria-label="选择具体时间" className="time-picker-popover" role="listbox">
+          <button
+            aria-selected={!value}
+            className={!value ? "is-selected time-clear-option" : "time-clear-option"}
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+            }}
+            role="option"
+            type="button"
+          >
+            全天，不设具体时间
+          </button>
+          <div className="time-option-grid">
+            {timeOptions.map((time) => (
+              <button
+                aria-selected={time === value}
+                className={time === value ? "is-selected" : ""}
+                key={time}
+                onClick={() => {
+                  onChange(time);
+                  setIsOpen(false);
+                }}
+                role="option"
+                type="button"
+              >
+                {time}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DurationField({
+  disabled,
+  id,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  id: string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <div className="duration-field">
+      <span id={`${id}-label`}>预计时长</span>
+      <div aria-labelledby={`${id}-label`} className="duration-presets">
+        {durationPresets.map((minutes) => (
+          <button
+            aria-pressed={value === String(minutes)}
+            disabled={disabled}
+            key={minutes}
+            onClick={() => onChange(String(minutes))}
+            type="button"
+          >
+            {minutes} 分钟
+          </button>
+        ))}
+      </div>
+      <label className="duration-custom-input" htmlFor={id}>
+        <span>自定义</span>
+        <input
+          disabled={disabled}
+          id={id}
+          inputMode="numeric"
+          onChange={(event) => onChange(event.target.value)}
+          pattern="[0-9]*"
+          placeholder="例如：75"
+          type="text"
+          value={value}
+        />
+        <span>分钟</span>
+      </label>
+    </div>
+  );
+}
+
 function toLocalTime(value: string | null): string {
   if (!value) return "";
 
@@ -231,6 +348,14 @@ function toLocalTime(value: string | null): string {
   if (Number.isNaN(date.getTime())) return "";
 
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function exceedsLocalDay(scheduledDate: string, scheduledTime: string, minutes: number): boolean {
+  const start = new Date(`${scheduledDate}T${scheduledTime}`);
+  const [year, month, day] = scheduledDate.split("-").map(Number);
+  const nextDay = new Date(year ?? 0, (month ?? 1) - 1, (day ?? 1) + 1);
+
+  return start.getTime() + minutes * 60_000 > nextDay.getTime();
 }
 
 function toDraft(task: TaskRecord): TaskDetailDraft {
@@ -285,6 +410,15 @@ export function TaskDetailDialog({
       (!Number.isInteger(estimatedMinutes) || estimatedMinutes <= 0)
     ) {
       setValidationError("预计时长必须是大于 0 的整数分钟。");
+      return;
+    }
+    if (
+      scheduledDate &&
+      scheduledTime &&
+      estimatedMinutes !== null &&
+      exceedsLocalDay(scheduledDate, scheduledTime, estimatedMinutes)
+    ) {
+      setValidationError("计划时长不能跨越到下一天。请调整时间或时长。");
       return;
     }
 
@@ -409,61 +543,67 @@ export function TaskDetailDialog({
               options={priorityOptions}
               value={draft.priority}
             />
-            <label htmlFor="task-detail-estimate">
-              预计时长（分钟）
-              <input
-                disabled={isSaving}
-                id="task-detail-estimate"
-                min="1"
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, estimatedMinutes: event.target.value }))
-                }
-                placeholder="例如：30"
-                step="1"
-                type="number"
-                value={draft.estimatedMinutes}
-              />
-            </label>
           </div>
 
-          <div className="detail-field-grid">
-            <DatePickerField
-              disabled={isSaving}
-              id="task-detail-scheduled-date"
-              label="计划日期"
-              onChange={(scheduledDate) =>
-                setDraft((current) => ({
-                  ...current,
-                  scheduledDate,
-                  scheduledTime: scheduledDate ? current.scheduledTime : "",
-                }))
-              }
-              value={draft.scheduledDate}
-            />
-            <label htmlFor="task-detail-scheduled-time">
-              具体时间（可选）
-              <input
+          <section aria-labelledby="task-schedule-title" className="task-schedule-section">
+            <div className="task-schedule-heading">
+              <div>
+                <p className="eyebrow">时间安排</p>
+                <h3 id="task-schedule-title">决定何时做，而非何时必须完成</h3>
+              </div>
+              <span>
+                {draft.scheduledTime ? "时间块" : draft.scheduledDate ? "全天任务" : "未安排"}
+              </span>
+            </div>
+            <div className="detail-field-grid">
+              <DatePickerField
+                disabled={isSaving}
+                id="task-detail-scheduled-date"
+                label="计划日期"
+                onChange={(scheduledDate) =>
+                  setDraft((current) => ({
+                    ...current,
+                    scheduledDate,
+                    scheduledTime: scheduledDate ? current.scheduledTime : "",
+                  }))
+                }
+                value={draft.scheduledDate}
+              />
+              <TimePickerField
                 disabled={isSaving || !draft.scheduledDate}
                 id="task-detail-scheduled-time"
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, scheduledTime: event.target.value }))
+                onChange={(scheduledTime) =>
+                  setDraft((current) => ({
+                    ...current,
+                    estimatedMinutes:
+                      scheduledTime && !current.estimatedMinutes ? "30" : current.estimatedMinutes,
+                    scheduledTime,
+                  }))
                 }
-                type="time"
                 value={draft.scheduledTime}
               />
-            </label>
-          </div>
-
-          <DatePickerField
-            disabled={isSaving}
-            id="task-detail-due-date"
-            label="截止日期"
-            onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate }))}
-            value={draft.dueDate}
-          />
-          {scheduleAfterDue ? (
-            <p className="form-hint">计划日期晚于截止日期；会保留此安排并在后续视图中提示。</p>
-          ) : null}
+            </div>
+            <DurationField
+              disabled={isSaving}
+              id="task-detail-estimate"
+              onChange={(estimatedMinutes) =>
+                setDraft((current) => ({ ...current, estimatedMinutes }))
+              }
+              value={draft.estimatedMinutes}
+            />
+            <DatePickerField
+              disabled={isSaving}
+              id="task-detail-due-date"
+              label="截止日期"
+              onChange={(dueDate) => setDraft((current) => ({ ...current, dueDate }))}
+              value={draft.dueDate}
+            />
+            {scheduleAfterDue ? (
+              <p className="schedule-warning">
+                计划日期晚于截止日期；会保留此安排并在后续视图中提示。
+              </p>
+            ) : null}
+          </section>
           {visibleError ? <p className="form-error">{visibleError}</p> : null}
 
           <div className="dialog-actions">
