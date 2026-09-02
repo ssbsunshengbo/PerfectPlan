@@ -4,7 +4,7 @@ PerfectPlan is a free, local-first personal planning desktop app. It helps peopl
 
 ## Current status
 
-The project is in its engineering-foundation stage. Product decisions and implementation milestones are documented in [`docs/`](./docs).
+The core offline planning experience is ready for public-test preparation: task capture, projects and tags, daily planning, calendar scheduling, local reminders, accessibility improvements, and reliability checks. Product decisions and implementation milestones are documented in [`docs/`](./docs).
 
 ## Development
 
@@ -22,11 +22,19 @@ pnpm check
 pnpm tauri build
 ```
 
+## Releases
+
+Releases are built for macOS and Windows from the manually triggered GitHub Actions workflow. It verifies that all application version files agree, builds a draft GitHub Release, and uploads the installers only after both platform builds succeed.
+
+See [the release guide](./docs/RELEASING.md) for versioning, signing, notarization, and the exact pre-release checklist.
+
 ## Documentation
 
 - [MVP product requirements](./docs/MVP_PRD.md)
 - [Task model](./docs/TASK_MODEL.md)
 - [Implementation plan](./docs/IMPLEMENTATION_PLAN.md)
+- [Release guide](./docs/RELEASING.md)
+- [Changelog](./CHANGELOG.md)
 
 ## License
 
