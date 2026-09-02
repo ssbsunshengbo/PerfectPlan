@@ -2989,11 +2989,25 @@ h1 {
 
 .tray-today-panel {
   box-sizing: border-box;
-  min-height: 100vh;
-  padding: 18px;
+  min-height: calc(100vh - 10px);
+  margin: 5px;
+  padding: 20px;
   overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 18px;
   color: #20252f;
-  background: #fbfbfc;
+  background: linear-gradient(155deg, #ffffff 0%, #f5f7fb 100%);
+  box-shadow:
+    0 18px 42px rgb(22 33 55 / 18%),
+    0 2px 7px rgb(22 33 55 / 12%);
+}
+:root.tray-window,
+:root.tray-window body,
+:root.tray-window #root {
+  min-width: 0;
+  min-height: 100%;
+  overflow: hidden;
+  background: transparent;
 }
 .tray-header {
   display: flex;
@@ -3010,8 +3024,8 @@ h1 {
   width: 28px;
   height: 28px;
   place-items: center;
-  border-radius: 9px;
-  background: #276ef1;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #4c8cff, #2464db);
   color: #fff;
   font-size: 15px;
   font-weight: 800;
@@ -3050,11 +3064,11 @@ h1 {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  margin: 16px 0 12px;
-  padding: 13px 14px;
-  border: 1px solid #e8eaf0;
-  border-radius: 12px;
-  background: linear-gradient(130deg, #f5f8ff 0%, #ffffff 80%);
+  margin: 18px 0 12px;
+  padding: 14px 15px;
+  border: 1px solid #dde7fb;
+  border-radius: 14px;
+  background: linear-gradient(130deg, #edf4ff 0%, #f8faff 80%);
 }
 .tray-summary strong {
   color: #276ef1;
@@ -3077,12 +3091,12 @@ h1 {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 39px;
-  padding: 3px 7px;
-  border-radius: 9px;
+  min-height: 41px;
+  padding: 3px 8px;
+  border-radius: 10px;
 }
 .tray-task-list li:hover {
-  background: #f1f4f9;
+  background: rgb(229 237 252 / 70%);
 }
 .tray-complete {
   width: 17px;
@@ -3090,7 +3104,7 @@ h1 {
   flex: 0 0 auto;
   border: 1.5px solid #b5bdca;
   border-radius: 50%;
-  background: transparent;
+  background: #fff;
   cursor: pointer;
 }
 .tray-complete:hover {
@@ -3134,13 +3148,13 @@ h1 {
 }
 .tray-today-panel footer {
   position: absolute;
-  right: 18px;
-  bottom: 16px;
-  left: 18px;
+  right: 25px;
+  bottom: 23px;
+  left: 25px;
   display: grid;
   grid-template-columns: 1fr 1.25fr;
   gap: 8px;
-  padding-top: 13px;
+  padding-top: 14px;
   border-top: 1px solid #e8eaf0;
 }
 .tray-today-panel footer button {

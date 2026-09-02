@@ -23,13 +23,16 @@
         "label": "tray",
         "title": "今日计划 · PerfectPlan",
         "url": "index.html",
-        "width": 348,
-        "height": 360,
+        "width": 356,
+        "height": 390,
         "visible": false,
         "decorations": false,
+        "transparent": true,
+        "shadow": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "resizable": false
+        "resizable": false,
+        "focusable": true
       }
     ],
     "security": {

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { moveWindow, Position } from "@tauri-apps/plugin-positioner";
 import { dailyPlanService } from "../features/daily-plan/daily-plan-service";
 import { taskService } from "../features/tasks/task-service";
 import type { TaskRecord } from "../features/tasks/task-types";
@@ -49,41 +48,63 @@ export function TrayTodayPanel() {
     let unlisten: (() => void) | undefined;
     void listen("tray-show-today", () => {
       setError(null);
-      void moveWindow(Position.TrayCenter).catch(() => undefined);
       void load();
     }).then((stop) => {
       unlisten = stop;
-      // The initial event can arrive while this hidden window is loading.
-      void moveWindow(Position.TrayCenter).catch(() => undefined);
     });
     return () => unlisten?.();
   }, [load]);
 
+  useEffect(() => {
+    document.documentElement.classList.add("tray-window");
+    document.body.classList.add("tray-window");
+    return () => {
+      document.documentElement.classList.remove("tray-window");
+      document.body.classList.remove("tray-window");
+    };
+  }, []);
+
   async function hidePanel() {
-    await getCurrentWindow().hide();
+    try {
+      await getCurrentWindow().hide();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法隐藏面板，请重试。");
+    }
   }
 
   async function openMain() {
-    const main = await WebviewWindow.getByLabel("main");
-    await main?.show();
-    await main?.setFocus();
-    await hidePanel();
+    try {
+      const main = await WebviewWindow.getByLabel("main");
+      await main?.show();
+      await main?.setFocus();
+      await hidePanel();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法打开完整计划，请重试。");
+    }
   }
 
   async function quickAdd() {
-    const main = await WebviewWindow.getByLabel("main");
-    await main?.show();
-    await main?.setFocus();
-    await emit("tray-open-quick-add");
-    await hidePanel();
+    try {
+      const main = await WebviewWindow.getByLabel("main");
+      await main?.show();
+      await main?.setFocus();
+      await emit("tray-open-quick-add");
+      await hidePanel();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法新建任务，请重试。");
+    }
   }
 
   async function openTask(task: TaskRecord) {
-    const main = await WebviewWindow.getByLabel("main");
-    await main?.show();
-    await main?.setFocus();
-    await emit("tray-open-task", task.id);
-    await hidePanel();
+    try {
+      const main = await WebviewWindow.getByLabel("main");
+      await main?.show();
+      await main?.setFocus();
+      await emit("tray-open-task", task.id);
+      await hidePanel();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法打开任务，请重试。");
+    }
   }
 
   async function complete(task: TaskRecord) {

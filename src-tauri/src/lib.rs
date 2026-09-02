@@ -1,4 +1,5 @@
 use tauri_plugin_sql::{Migration, MigrationKind};
+use tauri_plugin_positioner::{Position, WindowExt};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -87,10 +88,11 @@ fn show_main_window(app: &tauri::AppHandle) {
 
 fn show_tray_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("tray") {
+        // Move in Rust while the tray click rectangle is still available. This
+        // avoids relying on a webview IPC permission or a delayed JS listener.
+        let _ = window.move_window_constrained(Position::TrayCenter);
         let _ = window.show();
         let _ = window.set_focus();
-        // The positioner receives the native tray event above. Notify the webview
-        // only after it becomes visible so it can place itself beside that event.
         let _ = app.emit("tray-show-today", ());
     }
 }
