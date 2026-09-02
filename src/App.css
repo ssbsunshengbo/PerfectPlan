@@ -1,22 +1,21 @@
 :root {
-  --bg: #f4f5f0;
-  --panel: #fffefa;
-  --panel-soft: #f8faf6;
-  --side: rgb(237 243 238 / 88%);
-  --ink: #1b2924;
-  --muted: #64736d;
-  --faint: #8a9992;
-  --line: #dce4dd;
-  --accent: #27654f;
-  --accent-deep: #194d3c;
-  --accent-soft: #dceee3;
-  --danger: #b94e42;
-  --danger-soft: #fbeceb;
-  --shadow: 0 18px 50px rgb(35 53 44 / 8%);
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --panel-soft: #f2f3f5;
+  --side: #f1f2f4;
+  --ink: #202124;
+  --muted: #5f6368;
+  --faint: #8b9097;
+  --line: #e0e2e6;
+  --accent: #3367d6;
+  --accent-deep: #2452ba;
+  --accent-soft: #e9f0ff;
+  --danger: #c53b35;
+  --danger-soft: #feefee;
+  --shadow: 0 1px 2px rgb(32 33 36 / 8%);
   color: var(--ink);
   background: var(--bg);
-  font-family:
-    "Avenir Next", "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -29,9 +28,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 78% 0%, #e3eee6 0, transparent 30rem),
-    radial-gradient(circle at 12% 100%, #faecd6 0, transparent 32rem), var(--bg);
+  background: var(--bg);
 }
 button,
 input,
@@ -50,7 +47,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #27654f;
+  outline: 3px solid #5c8df0;
   outline-offset: 3px;
 }
 
@@ -65,8 +62,7 @@ textarea:focus-visible {
   flex-direction: column;
   border-right: 1px solid var(--line);
   background: var(--side);
-  backdrop-filter: blur(20px);
-  padding: 28px 16px 18px;
+  padding: 24px 14px 18px;
 }
 .brand {
   display: flex;
@@ -82,9 +78,9 @@ textarea:focus-visible {
   width: 31px;
   height: 31px;
   place-items: center;
-  border-radius: 11px;
-  background: linear-gradient(145deg, #3d896d, #215c48);
-  box-shadow: 0 6px 14px rgb(39 101 79 / 22%);
+  border-radius: 8px;
+  background: var(--accent);
+  box-shadow: none;
   color: #fff;
   font-family: Georgia, serif;
   font-size: 17px;
@@ -104,14 +100,16 @@ textarea:focus-visible {
   width: 100%;
   min-height: 39px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 7px;
   background: transparent;
   padding: 8px 10px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 590;
   text-align: left;
-  transition: 0.15s ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 .nav-item::before {
   width: 7px;
@@ -140,13 +138,12 @@ textarea:focus-visible {
   background: #b49145;
 }
 .nav-item:hover {
-  background: rgb(255 255 255 / 68%);
+  background: #fff;
   color: var(--ink);
-  transform: translateX(2px);
 }
 .nav-item.is-active {
   background: #fff;
-  box-shadow: 0 3px 12px rgb(28 51 40 / 7%);
+  box-shadow: none;
   color: var(--accent-deep);
   font-weight: 720;
 }
@@ -160,8 +157,8 @@ textarea:focus-visible {
   width: 100%;
   margin-top: 28px;
   border: 1px solid var(--line);
-  border-radius: 11px;
-  background: rgb(255 255 255 / 58%);
+  border-radius: 7px;
+  background: #fff;
   padding: 9px 10px;
   color: var(--muted);
   font-size: 13px;
@@ -188,8 +185,8 @@ kbd {
   display: grid;
   min-width: 0;
   grid-template-rows: auto 1fr auto;
-  gap: 28px;
-  padding: clamp(28px, 5vw, 64px);
+  gap: 24px;
+  padding: clamp(26px, 4vw, 48px);
 }
 .workspace-header {
   display: flex;
@@ -214,11 +211,11 @@ p {
 }
 h1 {
   margin-bottom: 0;
-  font-family: Georgia, "Songti SC", serif;
-  font-size: clamp(34px, 4vw, 48px);
-  font-weight: 600;
-  letter-spacing: -0.055em;
-  line-height: 1.08;
+  font-family: inherit;
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1.18;
 }
 .primary-button,
 .secondary-button,
@@ -346,6 +343,171 @@ h1 {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Desktop visual foundation: restrained hierarchy, compact controls, and semantic color. */
+.workspace-header h1,
+.today-intro h2,
+.task-list-heading h2,
+.upcoming-toolbar h2,
+.calendar-toolbar h2,
+.project-list h2,
+.calendar-candidates h3,
+.upcoming-group-heading h3 {
+  font-family: inherit;
+  letter-spacing: -0.035em;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.range-nav-button,
+.calendar-view-switcher,
+.calendar-view-switcher button,
+.compact-filter select,
+.search-field input,
+.task-row,
+.today-task-row,
+.project-row,
+.calendar-candidates,
+.upcoming-group,
+.upcoming-empty,
+.calendar-schedule-dialog {
+  border-radius: 8px;
+}
+
+.primary-button {
+  background: var(--accent);
+  box-shadow: none;
+}
+.primary-button:hover:not(:disabled) {
+  background: var(--accent-deep);
+  transform: none;
+}
+.secondary-button {
+  background: #fff;
+  box-shadow: none;
+}
+.secondary-button:hover:not(:disabled) {
+  background: var(--panel-soft);
+}
+.task-row,
+.today-task-row,
+.project-row,
+.upcoming-group,
+.calendar-candidates,
+.calendar-schedule-dialog {
+  box-shadow: none;
+}
+.task-row:hover,
+.today-task-row:hover {
+  background: #fafbff;
+}
+.task-complete-button {
+  border-color: #c9cdd3;
+}
+.task-complete-button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.search-field input,
+.compact-filter select {
+  min-height: 38px;
+  background: #fff;
+  border-color: #d9dde3;
+}
+.calendar-candidates {
+  background: #fff;
+  border-color: #dfe2e7;
+}
+.calendar-candidates h3 {
+  font-size: 15px;
+  font-weight: 720;
+}
+.calendar-candidate-task {
+  border-radius: 7px;
+}
+.calendar-candidate-task:hover {
+  background: #f3f6fd;
+}
+
+.upcoming-day {
+  width: 100%;
+  border-color: #e0e3e7;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.upcoming-day:hover {
+  border-color: #b7c8f4;
+  background: #f7f9ff;
+}
+.upcoming-day.is-today {
+  border-color: #cdd9f7;
+  background: #f6f8ff;
+}
+.upcoming-day.is-today span,
+.upcoming-day.is-today strong {
+  color: var(--accent-deep);
+}
+.upcoming-day.is-selected {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.upcoming-day.is-selected span,
+.upcoming-day.is-selected strong,
+.upcoming-day.is-selected small {
+  color: #fff;
+}
+.upcoming-selected-empty {
+  margin: 0;
+  padding: 6px 18px 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.project-summary-button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.project-summary-button:hover strong {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.project-actions {
+  gap: 7px;
+}
+.project-row {
+  min-height: 58px;
+}
+
+.calendar-board,
+.calendar-month-board {
+  border-color: #dfe2e7;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.calendar-time-task {
+  border-radius: 6px;
+  box-shadow: none;
+}
+.calendar-time-task:hover {
+  filter: brightness(0.98);
+}
+.calendar-all-day-task,
+.calendar-month-task {
+  border-radius: 5px;
+}
+.calendar-time-column:has(.calendar-time-task:hover),
+.calendar-time-column:has(.calendar-time-task:focus-within) {
+  background: #fbfcff;
 }
 .empty-state {
   display: grid;

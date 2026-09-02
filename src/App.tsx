@@ -243,6 +243,7 @@ function App() {
   const [todayCandidateTasks, setTodayCandidateTasks] = useState<TaskRecord[]>([]);
   const [isCompletedTodayExpanded, setIsCompletedTodayExpanded] = useState(false);
   const [upcomingStartDate, setUpcomingStartDate] = useState(() => toLocalDateValue());
+  const [selectedUpcomingDate, setSelectedUpcomingDate] = useState(() => toLocalDateValue());
   const [upcomingTasks, setUpcomingTasks] = useState<TaskRecord[]>([]);
   const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>("week");
   const [calendarAnchorDate, setCalendarAnchorDate] = useState(() => toLocalDateValue());
@@ -253,6 +254,7 @@ function App() {
     null,
   );
   const [calendarResize, setCalendarResize] = useState<CalendarResizeState | null>(null);
+  const [calendarDraggingTaskId, setCalendarDraggingTaskId] = useState<string | null>(null);
   const [isSavingCalendarSchedule, setIsSavingCalendarSchedule] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -997,6 +999,7 @@ function App() {
   async function handleUpcomingRangeChange(days: number) {
     const nextStartDate = addDays(upcomingStartDate, days);
     setUpcomingStartDate(nextStartDate);
+    setSelectedUpcomingDate(nextStartDate);
     setTaskError(null);
     setIsViewLoading(true);
 
@@ -1012,6 +1015,7 @@ function App() {
   async function handleUpcomingReset() {
     const today = toLocalDateValue();
     setUpcomingStartDate(today);
+    setSelectedUpcomingDate(today);
     setTaskError(null);
     setIsViewLoading(true);
 
@@ -1105,7 +1109,8 @@ function App() {
     startMinutes: number | null,
   ) {
     event.preventDefault();
-    const taskId = event.dataTransfer.getData("application/x-perfectplan-task");
+    const taskId =
+      event.dataTransfer.getData("application/x-perfectplan-task") || calendarDraggingTaskId;
     const task = calendarTasks.find((currentTask) => currentTask.id === taskId);
     if (!task) return;
 
@@ -1132,13 +1137,33 @@ function App() {
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "安排任务失败，请重试。");
       await loadCalendarTasks();
+    } finally {
+      setCalendarDraggingTaskId(null);
     }
   }
 
   function startCalendarDrag(event: DragEvent<HTMLElement>, task: TaskRecord) {
+    setCalendarDraggingTaskId(task.id);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("application/x-perfectplan-task", task.id);
     event.dataTransfer.setData("text/plain", task.id);
+  }
+
+  async function handleOpenProjectTasks(projectId: string) {
+    setActiveTagId(null);
+    setSearchQuery("");
+    setSearchInputValue("");
+    setPriorityFilter("all");
+    setProjectFilter(projectId);
+    setActiveView("收集箱");
+    setIsViewLoading(true);
+    try {
+      await loadInboxTasks(null, "", projectId, "all");
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "无法读取项目任务，请重试。");
+    } finally {
+      setIsViewLoading(false);
+    }
   }
 
   function startCalendarResize(event: PointerEvent<HTMLButtonElement>, task: TaskRecord) {
@@ -1682,14 +1707,23 @@ function App() {
                 const isTodayDate = date === toLocalDateValue();
 
                 return (
-                  <div
-                    className={isTodayDate ? "upcoming-day is-today" : "upcoming-day"}
+                  <button
+                    aria-pressed={date === selectedUpcomingDate}
+                    className={[
+                      "upcoming-day",
+                      isTodayDate ? "is-today" : "",
+                      date === selectedUpcomingDate ? "is-selected" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                     key={date}
+                    onClick={() => setSelectedUpcomingDate(date)}
+                    type="button"
                   >
                     <span>{weekday}</span>
                     <strong>{day}</strong>
                     <small>{taskCount > 0 ? `${taskCount} 项` : ""}</small>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -1702,69 +1736,72 @@ function App() {
               </div>
             ) : (
               <div className="upcoming-groups">
-                {upcomingDates.map((date) => {
-                  const tasksForDate = upcomingTasks.filter(
-                    (task) => upcomingDisplayDate(task) === date,
-                  );
-
-                  return (
-                    <section
-                      aria-labelledby={`upcoming-${date}`}
-                      className={
-                        tasksForDate.length > 0 ? "upcoming-group" : "upcoming-group is-empty"
-                      }
-                      key={date}
-                    >
-                      <div className="upcoming-group-heading">
-                        <h3 id={`upcoming-${date}`}>{formatUpcomingDate(date)}</h3>
-                        <span>
-                          {tasksForDate.length > 0 ? `${tasksForDate.length} 项` : "暂未安排"}
-                        </span>
-                      </div>
-                      {tasksForDate.length > 0 ? (
-                        <ul className="today-task-list">
-                          {tasksForDate.map((task) => (
-                            <li className="today-task-row" key={task.id}>
-                              <button
-                                aria-label={`完成任务：${task.title}`}
-                                className="task-complete-button"
-                                onClick={() => void handleCompleteTask(task)}
-                                type="button"
-                              />
-                              <button
-                                className="task-title"
-                                onClick={() => void openTaskDetails(task)}
-                                type="button"
-                              >
-                                {task.title}
-                              </button>
-                              <QuickRescheduleButton
-                                onReschedule={(selectedTask, target) =>
-                                  void handleQuickReschedule(selectedTask, target)
-                                }
-                                task={task}
-                              />
-                              {task.scheduledDate === date ? (
-                                <span className="upcoming-task-chip">计划</span>
-                              ) : null}
-                              {task.dueDate === date ? (
-                                <span className="upcoming-task-chip is-due">截止</span>
-                              ) : task.dueDate &&
-                                task.dueDate >= upcomingStartDate &&
-                                task.dueDate <= upcomingEndDate ? (
-                                <span className="upcoming-task-chip">
-                                  截止 {task.dueDate.slice(5)}
-                                </span>
-                              ) : task.dueDate && task.dueDate < upcomingStartDate ? (
-                                <span className="upcoming-task-chip is-due">已逾期</span>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </section>
-                  );
-                })}
+                <section
+                  aria-labelledby={`upcoming-${selectedUpcomingDate}`}
+                  className={
+                    upcomingTasks.some((task) => upcomingDisplayDate(task) === selectedUpcomingDate)
+                      ? "upcoming-group"
+                      : "upcoming-group is-empty"
+                  }
+                >
+                  <div className="upcoming-group-heading">
+                    <h3 id={`upcoming-${selectedUpcomingDate}`}>
+                      {formatUpcomingDate(selectedUpcomingDate)}
+                    </h3>
+                    <span>
+                      {upcomingTasks.filter(
+                        (task) => upcomingDisplayDate(task) === selectedUpcomingDate,
+                      ).length || "暂未安排"}
+                    </span>
+                  </div>
+                  {upcomingTasks.filter(
+                    (task) => upcomingDisplayDate(task) === selectedUpcomingDate,
+                  ).length > 0 ? (
+                    <ul className="today-task-list">
+                      {upcomingTasks
+                        .filter((task) => upcomingDisplayDate(task) === selectedUpcomingDate)
+                        .map((task) => (
+                          <li className="today-task-row" key={task.id}>
+                            <button
+                              aria-label={`完成任务：${task.title}`}
+                              className="task-complete-button"
+                              onClick={() => void handleCompleteTask(task)}
+                              type="button"
+                            />
+                            <button
+                              className="task-title"
+                              onClick={() => void openTaskDetails(task)}
+                              type="button"
+                            >
+                              {task.title}
+                            </button>
+                            <QuickRescheduleButton
+                              onReschedule={(selectedTask, target) =>
+                                void handleQuickReschedule(selectedTask, target)
+                              }
+                              task={task}
+                            />
+                            {task.scheduledDate === selectedUpcomingDate ? (
+                              <span className="upcoming-task-chip">计划</span>
+                            ) : null}
+                            {task.dueDate === selectedUpcomingDate ? (
+                              <span className="upcoming-task-chip is-due">截止</span>
+                            ) : task.dueDate &&
+                              task.dueDate >= upcomingStartDate &&
+                              task.dueDate <= upcomingEndDate ? (
+                              <span className="upcoming-task-chip">
+                                截止 {task.dueDate.slice(5)}
+                              </span>
+                            ) : task.dueDate && task.dueDate < upcomingStartDate ? (
+                              <span className="upcoming-task-chip is-due">已逾期</span>
+                            ) : null}
+                          </li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="upcoming-selected-empty">这天没有已计划或临近截止的任务。</p>
+                  )}
+                </section>
               </div>
             )}
           </section>
@@ -2210,6 +2247,7 @@ function App() {
                               draggable
                               key={task.id}
                               onClick={() => void openTaskDetails(task)}
+                              onDragEnd={() => setCalendarDraggingTaskId(null)}
                               onDragStart={(event) => startCalendarDrag(event, task)}
                               onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
                               style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
@@ -2309,6 +2347,7 @@ function App() {
                                 draggable
                                 key={task.id}
                                 onClick={() => void openTaskDetails(task)}
+                                onDragEnd={() => setCalendarDraggingTaskId(null)}
                                 onDragStart={(event) => startCalendarDrag(event, task)}
                                 onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
                                 style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
@@ -2391,6 +2430,7 @@ function App() {
                                     .join(" ")}
                                   draggable={calendarResize?.task.id !== task.id}
                                   key={task.id}
+                                  onDragEnd={() => setCalendarDraggingTaskId(null)}
                                   onDragStart={(event) => startCalendarDrag(event, task)}
                                   style={
                                     {
@@ -2459,6 +2499,7 @@ function App() {
                             className="calendar-candidate-task"
                             draggable
                             onClick={() => void openTaskDetails(task)}
+                            onDragEnd={() => setCalendarDraggingTaskId(null)}
                             onDragStart={(event) => startCalendarDrag(event, task)}
                             onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
                             style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
@@ -2668,13 +2709,25 @@ function App() {
                       className="project-color"
                       style={{ backgroundColor: project.color ?? "#98a6b5" }}
                     />
-                    <div className="project-summary">
+                    <button
+                      aria-label={`查看项目「${project.name}」下的所有任务`}
+                      className="project-summary project-summary-button"
+                      onClick={() => void handleOpenProjectTasks(project.id)}
+                      type="button"
+                    >
                       <strong>{project.name}</strong>
                       <span>
                         {tasks.filter((task) => task.projectId === project.id).length} 条活动任务
                       </span>
-                    </div>
+                    </button>
                     <div className="project-actions">
+                      <button
+                        className="secondary-button"
+                        onClick={() => void handleOpenProjectTasks(project.id)}
+                        type="button"
+                      >
+                        查看任务
+                      </button>
                       <button
                         aria-label={`上移项目：${project.name}`}
                         className="project-action-button"
