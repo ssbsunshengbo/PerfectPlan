@@ -33,7 +33,7 @@ import {
   type NotificationPermissionState,
 } from "./features/reminders/notification-service";
 import { reminderService } from "./features/reminders/reminder-service";
-import type { ReminderRecord } from "./features/reminders/reminder-types";
+import type { DueReminder, ReminderRecord } from "./features/reminders/reminder-types";
 import { projectService, type UpdateProjectInput } from "./features/projects/project-service";
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
@@ -138,6 +138,24 @@ function formatCalendarTime(value: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatReminderTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "现在";
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function reminderTimeTomorrow(value: string): string {
+  const source = new Date(value);
+  const target = new Date();
+  target.setDate(target.getDate() + 1);
+  target.setHours(source.getHours(), source.getMinutes(), 0, 0);
+  return target.toISOString();
 }
 
 function calendarTimeOffset(value: string | null): number {
@@ -266,6 +284,8 @@ function App() {
   const [notificationPermission, setNotificationPermission] =
     useState<NotificationPermissionState>("unknown");
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
+  const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
+  const [activeReminderActionId, setActiveReminderActionId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isSearchComposingRef = useRef(false);
 
@@ -346,6 +366,13 @@ function App() {
       try {
         const reminders = await reminderService.claimDueReminders();
         if (reminders.length === 0) return;
+
+        if (isMounted) {
+          setDueReminders((current) => [
+            ...current,
+            ...reminders.filter((reminder) => !current.some((item) => item.id === reminder.id)),
+          ]);
+        }
 
         if ((await getNotificationPermissionState()) === "granted") {
           reminders.forEach((reminder) => sendTaskReminderNotification(reminder.taskTitle));
@@ -465,7 +492,7 @@ function App() {
     }
   }
 
-  async function handleCompleteTask(task: TaskRecord) {
+  async function handleCompleteTask(task: TaskRecord): Promise<boolean> {
     setTaskError(null);
 
     try {
@@ -476,7 +503,7 @@ function App() {
           `「${task.title}」还有 ${activeSubtasks.length} 个未完成子任务。完成父任务不会完成子任务，仍要继续吗？`,
         )
       ) {
-        return;
+        return false;
       }
 
       const completion = await taskService.completeTask(task.id);
@@ -500,8 +527,58 @@ function App() {
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
+      return true;
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新任务失败，请重试。");
+      return false;
+    }
+  }
+
+  function removeDueReminder(reminderId: string) {
+    setDueReminders((current) => current.filter((reminder) => reminder.id !== reminderId));
+  }
+
+  async function handleOpenReminderTask(reminder: DueReminder) {
+    setActiveReminderActionId(reminder.id);
+    try {
+      const task = await taskService.getTask(reminder.taskId);
+      if (!task || task.status !== "active") {
+        removeDueReminder(reminder.id);
+        return;
+      }
+      await openTaskDetails(task);
+      removeDueReminder(reminder.id);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "无法打开提醒任务，请重试。");
+    } finally {
+      setActiveReminderActionId(null);
+    }
+  }
+
+  async function handleCompleteReminderTask(reminder: DueReminder) {
+    setActiveReminderActionId(reminder.id);
+    try {
+      const task = await taskService.getTask(reminder.taskId);
+      if (!task || task.status !== "active") {
+        removeDueReminder(reminder.id);
+        return;
+      }
+      if (await handleCompleteTask(task)) removeDueReminder(reminder.id);
+    } finally {
+      setActiveReminderActionId(null);
+    }
+  }
+
+  async function handleSnoozeReminder(reminder: DueReminder, remindAt: string) {
+    setActiveReminderActionId(reminder.id);
+    try {
+      await reminderService.snoozeReminder(reminder.taskId, remindAt);
+      removeDueReminder(reminder.id);
+      setReminderNotice(`「${reminder.taskTitle}」会在 ${formatReminderTime(remindAt)} 再次提醒。`);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "设置稍后提醒失败，请重试。");
+    } finally {
+      setActiveReminderActionId(null);
     }
   }
 
@@ -2643,12 +2720,83 @@ function App() {
         ) : null}
 
         {reminderNotice ? (
-          <div className="reminder-toast" role="status">
+          <div
+            className={
+              dueReminders.length > 0 ? "reminder-toast has-action-center" : "reminder-toast"
+            }
+            role="status"
+          >
             <span>{reminderNotice}</span>
             <button onClick={() => setReminderNotice(null)} type="button">
               知道了
             </button>
           </div>
+        ) : null}
+
+        {dueReminders.length > 0 ? (
+          <aside aria-live="assertive" className="reminder-action-center" aria-label="到期提醒">
+            <div className="reminder-action-heading">
+              <div>
+                <p className="eyebrow">到期提醒</p>
+                <h2>{dueReminders.length} 件事正在等你</h2>
+              </div>
+              <span>应用内操作</span>
+            </div>
+            <ul>
+              {dueReminders.map((reminder) => {
+                const isWorking = activeReminderActionId === reminder.id;
+
+                return (
+                  <li key={reminder.id}>
+                    <div>
+                      <strong>{reminder.taskTitle}</strong>
+                      <span>提醒时间：{formatReminderTime(reminder.remindAt)}</span>
+                    </div>
+                    <div className="reminder-action-buttons">
+                      <button
+                        disabled={isWorking}
+                        onClick={() => void handleOpenReminderTask(reminder)}
+                        type="button"
+                      >
+                        打开任务
+                      </button>
+                      <button
+                        disabled={isWorking}
+                        onClick={() => void handleCompleteReminderTask(reminder)}
+                        type="button"
+                      >
+                        完成
+                      </button>
+                      <button
+                        disabled={isWorking}
+                        onClick={() =>
+                          void handleSnoozeReminder(
+                            reminder,
+                            new Date(Date.now() + 30 * 60_000).toISOString(),
+                          )
+                        }
+                        type="button"
+                      >
+                        30 分钟后
+                      </button>
+                      <button
+                        disabled={isWorking}
+                        onClick={() =>
+                          void handleSnoozeReminder(
+                            reminder,
+                            reminderTimeTomorrow(reminder.remindAt),
+                          )
+                        }
+                        type="button"
+                      >
+                        明天
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </aside>
         ) : null}
 
         <footer className={`database-status is-${databaseState}`} aria-live="polite">

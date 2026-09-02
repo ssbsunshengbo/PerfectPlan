@@ -63,7 +63,7 @@ describe("reminderService", () => {
           created_at: "2026-09-01T00:00:00.000Z",
           id: "reminder-1",
           remind_at: "2026-09-02T08:45:00.000Z",
-          status: "pending",
+          status: "delivered",
           task_id: "task-1",
           updated_at: "2026-09-01T00:00:00.000Z",
         },
@@ -89,5 +89,23 @@ describe("reminderService", () => {
 
     expect(reminder?.taskId).toBe("task-2");
     expect(execute.mock.calls[1]?.[1]?.[2]).toBe("2026-09-03T08:45:00.000Z");
+  });
+
+  it("snoozes an active task by replacing its pending reminder", async () => {
+    select.mockResolvedValueOnce([{ id: "task-1" }]).mockResolvedValueOnce([
+      {
+        created_at: "2026-09-01T00:00:00.000Z",
+        id: "reminder-2",
+        remind_at: "2026-09-03T08:45:00.000Z",
+        status: "pending",
+        task_id: "task-1",
+        updated_at: "2026-09-01T00:00:00.000Z",
+      },
+    ]);
+
+    const reminder = await reminderService.snoozeReminder("task-1", "2026-09-03T08:45:00.000Z");
+
+    expect(reminder?.status).toBe("pending");
+    expect(execute.mock.calls[0]?.[0]).toContain("status = 'dismissed'");
   });
 });

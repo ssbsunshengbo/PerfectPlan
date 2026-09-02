@@ -68,6 +68,19 @@ export const reminderService = {
     return rows[0] ? toReminderRecord(rows[0]) : null;
   },
 
+  async getCurrentReminderForTask(taskId: string): Promise<ReminderRecord | null> {
+    const database = await getDatabase();
+    const rows = await database.select<ReminderRow[]>(
+      `SELECT id, task_id, remind_at, status, created_at, updated_at
+       FROM reminders
+       WHERE task_id = $1 AND status IN ('pending', 'delivered')
+       ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, remind_at ASC
+       LIMIT 1`,
+      [taskId],
+    );
+    return rows[0] ? toReminderRecord(rows[0]) : null;
+  },
+
   async setTaskReminder(taskId: string, remindAt: string | null): Promise<ReminderRecord | null> {
     await requireActiveRootTask(taskId);
     const database = await getDatabase();
@@ -114,7 +127,21 @@ export const reminderService = {
         ),
       ),
     );
-    return rows.map((row) => ({ ...toReminderRecord(row), taskTitle: row.task_title }));
+    return rows.map((row) => ({
+      ...toReminderRecord({ ...row, status: "delivered", updated_at: claimedAt }),
+      taskTitle: row.task_title,
+    }));
+  },
+
+  async snoozeReminder(taskId: string, remindAt: string): Promise<ReminderRecord> {
+    const normalizedRemindAt = normalizeReminderAt(remindAt);
+    if (Date.parse(normalizedRemindAt) <= Date.now()) {
+      throw new Error("稍后提醒时间需要晚于现在");
+    }
+
+    const reminder = await reminderService.setTaskReminder(taskId, normalizedRemindAt);
+    if (!reminder) throw new Error("无法设置稍后提醒");
+    return reminder;
   },
 
   async carryReminderToRecurringTask(
@@ -123,7 +150,7 @@ export const reminderService = {
     nextTaskId: string,
     nextScheduledStartAt: string | null,
   ): Promise<ReminderRecord | null> {
-    const reminder = await reminderService.getPendingReminderForTask(sourceTaskId);
+    const reminder = await reminderService.getCurrentReminderForTask(sourceTaskId);
     if (!reminder || !sourceScheduledStartAt || !nextScheduledStartAt) return null;
 
     const sourceStart = Date.parse(sourceScheduledStartAt);
