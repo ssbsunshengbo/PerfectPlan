@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { dailyPlanService } from "../features/daily-plan/daily-plan-service";
 import { taskService } from "../features/tasks/task-service";
+import { projectService } from "../features/projects/project-service";
+import type { ProjectRecord } from "../features/projects/project-types";
 import type { TaskRecord } from "../features/tasks/task-types";
 
 function localDate() {
@@ -14,18 +16,22 @@ function localDate() {
 
 export function TrayTodayPanel() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [projectsById, setProjectsById] = useState<Map<string, ProjectRecord>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const today = localDate();
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [focus, scheduled, overdue] = await Promise.all([
+      const [focus, scheduled, overdue, projects] = await Promise.all([
         dailyPlanService.listFocusTasks(today),
         taskService.listActiveTasksScheduledOn(today),
         taskService.listOverdueActiveTasks(today),
+        projectService.listActiveProjects(),
       ]);
       const seen = new Set<string>();
       setTasks(
@@ -33,6 +39,7 @@ export function TrayTodayPanel() {
           (task) => !seen.has(task.id) && Boolean(seen.add(task.id)),
         ),
       );
+      setProjectsById(new Map(projects.map((project) => [project.id, project])));
     } finally {
       setIsLoading(false);
     }
@@ -108,14 +115,31 @@ export function TrayTodayPanel() {
     }
   }
 
+  async function createTodayTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = newTaskTitle.trim();
+    if (!title) return;
+
+    setIsCreating(true);
+    setError(null);
+    try {
+      const task = await taskService.createTask({ title });
+      await taskService.updateTask(task.id, { scheduledDate: today });
+      setNewTaskTitle("");
+      await load();
+    } catch (reason) {
+      setError(`无法添加任务：${String(reason)}`);
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   return (
     <main className="tray-today-panel">
       <header className="tray-header">
         <div className="tray-heading">
-          <span className="tray-mark" aria-hidden="true">
-            ✓
-          </span>
           <div>
+            <h1>今天</h1>
             <p className="tray-date">
               {new Intl.DateTimeFormat("zh-CN", {
                 month: "long",
@@ -123,7 +147,6 @@ export function TrayTodayPanel() {
                 weekday: "long",
               }).format(new Date())}
             </p>
-            <h1>今天</h1>
           </div>
         </div>
         <button
@@ -135,39 +158,64 @@ export function TrayTodayPanel() {
           ×
         </button>
       </header>
-      <section className="tray-summary" aria-label="今日任务摘要">
-        <strong>{isLoading ? "—" : tasks.length}</strong>
-        <span>项待完成</span>
-      </section>
+      <form className="tray-quick-add" onSubmit={(event) => void createTodayTask(event)}>
+        <span aria-hidden="true">＋</span>
+        <input
+          aria-label="添加到今天的任务"
+          disabled={isCreating}
+          onChange={(event) => setNewTaskTitle(event.target.value)}
+          placeholder="添加任务"
+          value={newTaskTitle}
+        />
+      </form>
+      <div className="tray-section-heading">
+        <span>待完成</span>
+        <span>{isLoading ? "" : `${tasks.length} 项`}</span>
+      </div>
       {isLoading ? (
         <p className="tray-empty">正在读取今日计划…</p>
       ) : tasks.length ? (
         <ul className="tray-task-list">
-          {tasks.slice(0, 6).map((task) => (
-            <li key={task.id}>
-              <button
-                aria-label={`完成任务：${task.title}`}
-                className="tray-complete"
-                onClick={() => void complete(task)}
-                disabled={updatingTaskId === task.id}
-                type="button"
-              />
-              <button className="tray-task-title" onClick={() => void openTask(task)} type="button">
-                {task.title}
-              </button>
-            </li>
-          ))}
+          {tasks.slice(0, 5).map((task) => {
+            const project = task.projectId ? projectsById.get(task.projectId) : null;
+            return (
+              <li key={task.id}>
+                <button
+                  aria-label={`完成任务：${task.title}`}
+                  className="tray-complete"
+                  onClick={() => void complete(task)}
+                  disabled={updatingTaskId === task.id}
+                  type="button"
+                />
+                <button
+                  className="tray-task-title"
+                  onClick={() => void openTask(task)}
+                  type="button"
+                >
+                  {task.title}
+                </button>
+                {project ? (
+                  <span
+                    className="tray-project-pill"
+                    style={{ "--project-color": project.color ?? "#8b92a0" } as React.CSSProperties}
+                  >
+                    {project.name}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="tray-empty">今天没有待完成任务。</p>
       )}
       {error ? <p className="tray-error">{error}</p> : null}
       <footer>
-        <button className="tray-new-task" onClick={() => void quickAdd()} type="button">
-          <span aria-hidden="true">＋</span> 新建任务
-        </button>
         <button className="tray-open-main" onClick={() => void openMain()} type="button">
-          打开完整计划 <span aria-hidden="true">↗</span>
+          打开完整计划 <span aria-hidden="true">→</span>
+        </button>
+        <button className="tray-new-task" onClick={() => void quickAdd()} type="button">
+          在主窗口新建
         </button>
       </footer>
     </main>
