@@ -133,6 +133,7 @@ function App() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
   const [todayFocusTasks, setTodayFocusTasks] = useState<TaskRecord[]>([]);
+  const [todayCarryoverSuggestions, setTodayCarryoverSuggestions] = useState<TaskRecord[]>([]);
   const [todayScheduledTasks, setTodayScheduledTasks] = useState<TaskRecord[]>([]);
   const [todayOverdueTasks, setTodayOverdueTasks] = useState<TaskRecord[]>([]);
   const [todayCompletedTasks, setTodayCompletedTasks] = useState<TaskRecord[]>([]);
@@ -162,6 +163,11 @@ function App() {
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [isSavingTaskDetails, setIsSavingTaskDetails] = useState(false);
   const [isSavingSubtask, setIsSavingSubtask] = useState(false);
+  const [isDailyReviewOpen, setIsDailyReviewOpen] = useState(false);
+  const [dailyReviewTasks, setDailyReviewTasks] = useState<TaskRecord[]>([]);
+  const [selectedCarryoverTaskIds, setSelectedCarryoverTaskIds] = useState<string[]>([]);
+  const [isSavingDailyReview, setIsSavingDailyReview] = useState(false);
+  const [dailyReviewMessage, setDailyReviewMessage] = useState<string | null>(null);
   const [lastTaskAction, setLastTaskAction] = useState<ReversibleTaskAction | null>(null);
   const [isUndoingTaskAction, setIsUndoingTaskAction] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -250,16 +256,24 @@ function App() {
 
   async function loadTodayTasks() {
     const today = toLocalDateValue();
-    const [focusTasks, scheduledTasks, overdueTasks, completedTasks, candidateTasks] =
-      await Promise.all([
-        dailyPlanService.listFocusTasks(today),
-        taskService.listActiveTasksScheduledOn(today),
-        taskService.listOverdueActiveTasks(today),
-        taskService.listCompletedTasksOn(today),
-        taskService.listActiveTasks(),
-      ]);
+    const [
+      focusTasks,
+      carryoverSuggestions,
+      scheduledTasks,
+      overdueTasks,
+      completedTasks,
+      candidateTasks,
+    ] = await Promise.all([
+      dailyPlanService.listFocusTasks(today),
+      dailyPlanService.listCarryoverSuggestions(today),
+      taskService.listActiveTasksScheduledOn(today),
+      taskService.listOverdueActiveTasks(today),
+      taskService.listCompletedTasksOn(today),
+      taskService.listActiveTasks(),
+    ]);
 
     setTodayFocusTasks(focusTasks);
+    setTodayCarryoverSuggestions(carryoverSuggestions);
     setTodayScheduledTasks(scheduledTasks);
     setTodayOverdueTasks(overdueTasks);
     setTodayCompletedTasks(completedTasks);
@@ -705,6 +719,52 @@ function App() {
     }
   }
 
+  async function openDailyReview() {
+    setTaskError(null);
+    setDailyReviewMessage(null);
+
+    try {
+      const reviewTasks = await dailyPlanService.listDailyReviewTasks(toLocalDateValue());
+      setDailyReviewTasks(reviewTasks);
+      setSelectedCarryoverTaskIds(reviewTasks.map((task) => task.id));
+      setIsDailyReviewOpen(true);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "无法读取今日未完成任务，请重试。");
+    }
+  }
+
+  function toggleCarryoverTask(taskId: string) {
+    setSelectedCarryoverTaskIds((currentTaskIds) =>
+      currentTaskIds.includes(taskId)
+        ? currentTaskIds.filter((currentTaskId) => currentTaskId !== taskId)
+        : [...currentTaskIds, taskId],
+    );
+  }
+
+  async function handleSaveDailyReview() {
+    setTaskError(null);
+    setIsSavingDailyReview(true);
+
+    try {
+      await dailyPlanService.createCarryoverSuggestions(
+        selectedCarryoverTaskIds,
+        addDays(toLocalDateValue(), 1),
+      );
+      setIsDailyReviewOpen(false);
+      setDailyReviewTasks([]);
+      setSelectedCarryoverTaskIds([]);
+      setDailyReviewMessage(
+        selectedCarryoverTaskIds.length > 0
+          ? `已将 ${selectedCarryoverTaskIds.length} 项保留到明日建议。`
+          : "今日收尾完成，没有任务被带到明天。",
+      );
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "保存明日建议失败，请重试。");
+    } finally {
+      setIsSavingDailyReview(false);
+    }
+  }
+
   async function handleTagFilter(tagId: string | null) {
     setTaskError(null);
     setActiveTagId(tagId);
@@ -802,6 +862,7 @@ function App() {
   const archivedProjects = projects.filter((project) => project.status === "archived");
   const todayFocusTaskIds = new Set(todayFocusTasks.map((task) => task.id));
   const todayOtherTaskIds = new Set([
+    ...todayCarryoverSuggestions.map((task) => task.id),
     ...todayScheduledTasks.map((task) => task.id),
     ...todayOverdueTasks.map((task) => task.id),
   ]);
@@ -1058,8 +1119,22 @@ function App() {
                 <h2 id="today-view-title">{todayLabel}</h2>
                 <p>先确定最重要的几件事，再处理已经安排和逾期的任务。</p>
               </div>
-              <span className="today-count">{todayFocusTasks.length}/3 个重点</span>
+              <div className="today-intro-actions">
+                <span className="today-count">{todayFocusTasks.length}/3 个重点</span>
+                <button
+                  className="secondary-button daily-review-trigger"
+                  onClick={() => void openDailyReview()}
+                  type="button"
+                >
+                  每日收尾
+                </button>
+              </div>
             </div>
+            {dailyReviewMessage ? (
+              <p aria-live="polite" className="daily-review-message">
+                {dailyReviewMessage}
+              </p>
+            ) : null}
 
             <section aria-labelledby="today-focus-title" className="today-section is-focus">
               <div className="today-section-header">
@@ -1212,6 +1287,54 @@ function App() {
                 <p className="today-empty">还没有安排到今天的任务。</p>
               )}
             </section>
+
+            {todayCarryoverSuggestions.length > 0 ? (
+              <section
+                aria-labelledby="today-carryover-title"
+                className="today-section is-carryover"
+              >
+                <div className="today-section-header">
+                  <div>
+                    <p className="eyebrow">从昨日继续</p>
+                    <h3 id="today-carryover-title">留给今天再决定</h3>
+                  </div>
+                  <span className="today-section-count">{todayCarryoverSuggestions.length}</span>
+                </div>
+                <p className="carryover-intro">这些任务仍保留在原项目中；需要时再设为今日重点。</p>
+                <ul className="today-task-list">
+                  {todayCarryoverSuggestions.map((task) => (
+                    <li className="today-task-row" key={task.id}>
+                      <button
+                        aria-label={`完成任务：${task.title}`}
+                        className="task-complete-button"
+                        onClick={() => void handleCompleteTask(task)}
+                        type="button"
+                      />
+                      <button
+                        className="task-title"
+                        onClick={() => void openTaskDetails(task)}
+                        type="button"
+                      >
+                        {task.title}
+                      </button>
+                      <QuickRescheduleButton
+                        onReschedule={(selectedTask, target) =>
+                          void handleQuickReschedule(selectedTask, target)
+                        }
+                        task={task}
+                      />
+                      <button
+                        className="today-action-button"
+                        onClick={() => void handleAddFocusTask(task)}
+                        type="button"
+                      >
+                        设为重点
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             {todayCandidates.length > 0 ? (
               <section
@@ -1769,6 +1892,94 @@ function App() {
           task={selectedTask}
           taskTags={taskTags}
         />
+      ) : null}
+
+      {isDailyReviewOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="daily-review-description"
+            aria-labelledby="daily-review-title"
+            aria-modal="true"
+            className="daily-review-dialog"
+            role="dialog"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !isSavingDailyReview) setIsDailyReviewOpen(false);
+            }}
+          >
+            <div className="quick-add-header">
+              <div>
+                <p className="eyebrow">每日收尾</p>
+                <h2 id="daily-review-title">把未完成留给明天</h2>
+              </div>
+              <button
+                aria-label="关闭每日收尾"
+                className="icon-button"
+                disabled={isSavingDailyReview}
+                onClick={() => setIsDailyReviewOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <p id="daily-review-description">
+              勾选的任务会出现在明天的建议区域，不会改变原项目、任务状态或计划日期。
+            </p>
+            {dailyReviewTasks.length > 0 ? (
+              <ul className="daily-review-list">
+                {dailyReviewTasks.map((task) => {
+                  const isSelected = selectedCarryoverTaskIds.includes(task.id);
+
+                  return (
+                    <li key={task.id}>
+                      <label>
+                        <input
+                          checked={isSelected}
+                          disabled={isSavingDailyReview}
+                          onChange={() => toggleCarryoverTask(task.id)}
+                          type="checkbox"
+                        />
+                        <span>
+                          <strong>{task.title}</strong>
+                          <small>
+                            {task.scheduledDate === toLocalDateValue() ? "今日已安排" : "今日重点"}
+                          </small>
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="daily-review-empty">
+                <span aria-hidden="true">✓</span>
+                <strong>今天没有需要继续的任务</strong>
+                <p>已安排与今日重点都已完成，安心收尾吧。</p>
+              </div>
+            )}
+            <div className="dialog-actions">
+              <button
+                className="secondary-button"
+                disabled={isSavingDailyReview}
+                onClick={() => setIsDailyReviewOpen(false)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="primary-button"
+                disabled={isSavingDailyReview}
+                onClick={() => void handleSaveDailyReview()}
+                type="button"
+              >
+                {isSavingDailyReview
+                  ? "正在保存…"
+                  : dailyReviewTasks.length > 0
+                    ? `保留 ${selectedCarryoverTaskIds.length} 项到明天`
+                    : "完成收尾"}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {isProjectCreateOpen ? (

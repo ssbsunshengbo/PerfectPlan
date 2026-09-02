@@ -734,6 +734,25 @@ h1 {
   font-size: 13px;
   line-height: 1.6;
 }
+.today-intro-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.daily-review-trigger {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.daily-review-message {
+  margin: -3px 4px 1px;
+  border-left: 3px solid #8abda0;
+  background: #eef8f0;
+  padding: 8px 10px;
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 680;
+}
 .today-count,
 .today-section-count,
 .today-over-limit,
@@ -767,6 +786,18 @@ h1 {
 .today-section.is-candidates,
 .today-section.is-completed {
   background: rgb(248 250 247 / 82%);
+}
+.today-section.is-carryover {
+  border-color: #ccd5ec;
+  background: linear-gradient(135deg, rgb(244 246 255 / 98%), rgb(255 254 250 / 94%));
+}
+.carryover-intro {
+  margin: 0;
+  border-top: 1px solid rgb(207 215 235 / 72%);
+  padding: 13px 20px;
+  color: #68728d;
+  font-size: 12px;
+  line-height: 1.55;
 }
 .today-section-header {
   display: flex;
@@ -1096,6 +1127,93 @@ h1 {
   background: var(--panel);
   box-shadow: 0 30px 90px rgb(24 41 33 / 24%);
   padding: 26px;
+}
+.daily-review-dialog {
+  width: min(100%, 560px);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 20px;
+  background: var(--panel);
+  box-shadow: 0 30px 90px rgb(24 41 33 / 24%);
+  padding: 26px;
+}
+.daily-review-dialog > p {
+  margin: -8px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.daily-review-list {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+.daily-review-list label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.daily-review-list label:hover {
+  border-color: #a9bfd6;
+  background: #f4f6ff;
+}
+.daily-review-list input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+}
+.daily-review-list span {
+  display: grid;
+  gap: 3px;
+}
+.daily-review-list strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+.daily-review-list small {
+  color: var(--faint);
+  font-size: 11px;
+}
+.daily-review-empty {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin-bottom: 20px;
+  border: 1px dashed #b9d5c4;
+  border-radius: 14px;
+  background: #f4faf5;
+  padding: 27px 20px;
+  text-align: center;
+}
+.daily-review-empty > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 14px;
+  font-weight: 800;
+}
+.daily-review-empty strong {
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+.daily-review-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 .confirmation-dialog h2 {
   margin-bottom: 9px;
@@ -1831,11 +1949,25 @@ h1 {
   }
   .quick-add-dialog,
   .task-details-dialog,
+  .daily-review-dialog,
   .confirmation-dialog {
     border-color: rgb(255 255 255 / 8%);
   }
   .danger-button {
     background: #352525;
+  }
+  .daily-review-list label {
+    background: #26342e;
+  }
+  .daily-review-list label:hover {
+    background: #293a45;
+  }
+  .daily-review-empty {
+    border-color: #49705a;
+    background: #203c2e;
+  }
+  .daily-review-message {
+    background: #203c2e;
   }
   .task-delete-button:hover {
     background: #472c2a;

@@ -74,6 +74,71 @@ export const dailyPlanService = {
     return rows.map(toTaskRecord);
   },
 
+  async listCarryoverSuggestions(planDate: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${qualifiedTaskSelectFields}
+       FROM daily_plan_entries
+       INNER JOIN tasks ON tasks.id = daily_plan_entries.task_id
+       WHERE daily_plan_entries.plan_date = $1
+         AND daily_plan_entries.is_focus = 0
+         AND tasks.status = 'active'
+         AND tasks.parent_task_id IS NULL
+       ORDER BY daily_plan_entries.created_at ASC`,
+      [validateLocalDate(planDate)],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async listDailyReviewTasks(planDate: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${qualifiedTaskSelectFields}
+       FROM tasks
+       WHERE tasks.status = 'active'
+         AND tasks.parent_task_id IS NULL
+         AND (
+           tasks.scheduled_date = $1
+           OR EXISTS (
+             SELECT 1 FROM daily_plan_entries
+             WHERE daily_plan_entries.task_id = tasks.id
+               AND daily_plan_entries.plan_date = $1
+               AND daily_plan_entries.is_focus = 1
+           )
+         )
+       ORDER BY tasks.priority DESC, tasks.sort_order ASC, tasks.created_at DESC`,
+      [validateLocalDate(planDate)],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async createCarryoverSuggestions(taskIds: string[], planDate: string): Promise<void> {
+    const database = await getDatabase();
+    const targetDate = validateLocalDate(planDate);
+    const uniqueTaskIds = [...new Set(taskIds)];
+    const createdAt = new Date().toISOString();
+
+    await Promise.all(
+      uniqueTaskIds.map((taskId) =>
+        database.execute(
+          `INSERT OR IGNORE INTO daily_plan_entries (
+            id, task_id, plan_date, is_focus, sort_order, created_at, updated_at
+          )
+          SELECT $1, $2, $3, 0,
+                 COALESCE((SELECT MAX(sort_order) + 1 FROM daily_plan_entries WHERE plan_date = $3), 0),
+                 $4, $4
+          WHERE EXISTS (
+            SELECT 1 FROM tasks
+            WHERE id = $2 AND status = 'active' AND parent_task_id IS NULL
+          )`,
+          [crypto.randomUUID(), taskId, targetDate, createdAt],
+        ),
+      ),
+    );
+  },
+
   async addFocusTask(taskId: string, planDate: string): Promise<void> {
     const database = await getDatabase();
     const date = validateLocalDate(planDate);
@@ -88,13 +153,16 @@ export const dailyPlanService = {
     if (!rows[0]) throw new Error("只能将未完成的主任务设为今日重点");
 
     await database.execute(
-      `INSERT OR IGNORE INTO daily_plan_entries (
+      `INSERT INTO daily_plan_entries (
         id, task_id, plan_date, is_focus, sort_order, created_at, updated_at
       ) VALUES (
         $1, $2, $3, 1,
         COALESCE((SELECT MAX(sort_order) + 1 FROM daily_plan_entries WHERE plan_date = $3), 0),
         $4, $4
-      )`,
+      )
+      ON CONFLICT(task_id, plan_date) DO UPDATE SET
+        is_focus = 1,
+        updated_at = excluded.updated_at`,
       [crypto.randomUUID(), taskId, date, new Date().toISOString()],
     );
   },
