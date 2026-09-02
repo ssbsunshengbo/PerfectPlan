@@ -481,6 +481,60 @@ h1 {
   background: var(--danger-soft);
   color: var(--danger);
 }
+.quick-reschedule {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+}
+.quick-reschedule:has(.quick-reschedule-menu) {
+  z-index: 4;
+}
+.quick-reschedule-trigger {
+  border: 1px solid #cbd8cf;
+  border-radius: 8px;
+  background: #fff;
+  padding: 5px 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 730;
+  white-space: nowrap;
+}
+.quick-reschedule-trigger:hover,
+.quick-reschedule-trigger[aria-expanded="true"] {
+  border-color: #9ccbb4;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+.quick-reschedule-menu {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  min-width: 146px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 16px 38px rgb(27 50 39 / 18%);
+  padding: 5px;
+}
+.quick-reschedule-menu button {
+  min-height: 33px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 680;
+  text-align: left;
+}
+.quick-reschedule-menu button:hover,
+.quick-reschedule-menu button:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
 
 .upcoming-view {
   display: grid;
@@ -697,7 +751,7 @@ h1 {
   color: var(--accent-deep);
 }
 .today-section {
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: rgb(255 254 250 / 86%);
@@ -1681,6 +1735,12 @@ h1 {
   .project-list li {
     padding-inline: 16px;
   }
+  .today-task-row {
+    flex-wrap: wrap;
+  }
+  .today-task-row .task-title {
+    min-width: 120px;
+  }
   .detail-field-grid {
     grid-template-columns: 1fr;
   }
@@ -1743,6 +1803,7 @@ h1 {
   .task-details-form select,
   .subtask-create-form input,
   .secondary-button,
+  .quick-reschedule-trigger,
   .project-action-button {
     background: #26342e;
     color: var(--ink);

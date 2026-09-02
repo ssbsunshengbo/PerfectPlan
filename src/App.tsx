@@ -16,10 +16,21 @@ type DatabaseState = "loading" | "ready" | "error";
 const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项目", "标签", "回收站"] as const;
 type NavigationItem = (typeof navigationItems)[number];
 type ReversibleTaskAction = {
-  kind: "created" | "completed" | "trashed";
+  kind: "created" | "completed" | "rescheduled" | "trashed";
   nextRecurringTaskId?: string | null;
+  previousSchedule?: Pick<TaskRecord, "scheduledDate" | "scheduledStartAt">;
+  rescheduleLabel?: string;
   task: Pick<TaskRecord, "id" | "title">;
 };
+
+type QuickRescheduleTarget = "tonight" | "tomorrow" | "nextWeek" | "unscheduled";
+
+const quickRescheduleOptions: Array<{ label: string; target: QuickRescheduleTarget }> = [
+  { label: "今晚", target: "tonight" },
+  { label: "明天", target: "tomorrow" },
+  { label: "下周", target: "nextWeek" },
+  { label: "未指定日期", target: "unscheduled" },
+];
 
 function toLocalDateValue(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
@@ -47,6 +58,54 @@ function addDays(localDate: string, amount: number): string {
   const date = toLocalDate(localDate);
   date.setDate(date.getDate() + amount);
   return toLocalDateValue(date);
+}
+
+function nextMonday(localDate: string): string {
+  const date = toLocalDate(localDate);
+  const weekday = date.getDay() || 7;
+  return addDays(localDate, 8 - weekday);
+}
+
+function QuickRescheduleButton({
+  onReschedule,
+  task,
+}: {
+  onReschedule: (task: TaskRecord, target: QuickRescheduleTarget) => void;
+  task: TaskRecord;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="quick-reschedule">
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        aria-label={`改期任务：${task.title}`}
+        className="quick-reschedule-trigger"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        改期 <span aria-hidden="true">⌄</span>
+      </button>
+      {isOpen ? (
+        <div aria-label={`改期「${task.title}」`} className="quick-reschedule-menu" role="menu">
+          {quickRescheduleOptions.map((option) => (
+            <button
+              key={option.target}
+              onClick={() => {
+                onReschedule(task, option.target);
+                setIsOpen(false);
+              }}
+              role="menuitem"
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function formatUpcomingDate(localDate: string): string {
@@ -267,6 +326,49 @@ function App() {
       if (activeView === "即将到来") await loadUpcomingTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新任务失败，请重试。");
+    }
+  }
+
+  async function handleQuickReschedule(task: TaskRecord, target: QuickRescheduleTarget) {
+    const today = toLocalDateValue();
+    const scheduledDate =
+      target === "tonight"
+        ? today
+        : target === "tomorrow"
+          ? addDays(today, 1)
+          : target === "nextWeek"
+            ? nextMonday(today)
+            : null;
+    const rescheduleLabel =
+      target === "tonight"
+        ? "今晚"
+        : target === "tomorrow"
+          ? "明天"
+          : target === "nextWeek"
+            ? "下周"
+            : "未指定日期";
+
+    setTaskError(null);
+
+    try {
+      await taskService.updateTask(task.id, {
+        scheduledDate,
+        scheduledStartAt: null,
+      });
+      setLastTaskAction({
+        kind: "rescheduled",
+        previousSchedule: {
+          scheduledDate: task.scheduledDate,
+          scheduledStartAt: task.scheduledStartAt,
+        },
+        rescheduleLabel,
+        task: { id: task.id, title: task.title },
+      });
+      await loadInboxTasks();
+      if (activeView === "今日") await loadTodayTasks();
+      if (activeView === "即将到来") await loadUpcomingTasks();
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "改期失败，请重试。");
     }
   }
 
@@ -516,6 +618,11 @@ function App() {
           currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
         );
         setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
+      } else if (lastTaskAction.kind === "rescheduled" && lastTaskAction.previousSchedule) {
+        await taskService.updateTask(lastTaskAction.task.id, lastTaskAction.previousSchedule);
+        await loadInboxTasks();
+        if (activeView === "今日") await loadTodayTasks();
+        if (activeView === "即将到来") await loadUpcomingTasks();
       } else {
         if (lastTaskAction.kind === "completed" && lastTaskAction.nextRecurringTaskId) {
           await taskService.undoRecurringCompletion(
@@ -914,6 +1021,12 @@ function App() {
                               >
                                 {task.title}
                               </button>
+                              <QuickRescheduleButton
+                                onReschedule={(selectedTask, target) =>
+                                  void handleQuickReschedule(selectedTask, target)
+                                }
+                                task={task}
+                              />
                               {task.scheduledDate === date ? (
                                 <span className="upcoming-task-chip">计划</span>
                               ) : null}
@@ -975,6 +1088,12 @@ function App() {
                       >
                         {task.title}
                       </button>
+                      <QuickRescheduleButton
+                        onReschedule={(selectedTask, target) =>
+                          void handleQuickReschedule(selectedTask, target)
+                        }
+                        task={task}
+                      />
                       {task.scheduledDate ? <span className="today-date-chip">已计划</span> : null}
                       <button
                         aria-label={`移出今日重点：${task.title}`}
@@ -1021,6 +1140,12 @@ function App() {
                         >
                           {task.title}
                         </button>
+                        <QuickRescheduleButton
+                          onReschedule={(selectedTask, target) =>
+                            void handleQuickReschedule(selectedTask, target)
+                          }
+                          task={task}
+                        />
                         <span className="today-date-chip is-overdue">截止 {task.dueDate}</span>
                         <button
                           className="today-action-button"
@@ -1064,6 +1189,12 @@ function App() {
                         >
                           {task.title}
                         </button>
+                        <QuickRescheduleButton
+                          onReschedule={(selectedTask, target) =>
+                            void handleQuickReschedule(selectedTask, target)
+                          }
+                          task={task}
+                        />
                         {task.scheduledStartAt ? (
                           <span className="today-date-chip">有时间安排</span>
                         ) : null}
@@ -1103,6 +1234,12 @@ function App() {
                       >
                         {task.title}
                       </button>
+                      <QuickRescheduleButton
+                        onReschedule={(selectedTask, target) =>
+                          void handleQuickReschedule(selectedTask, target)
+                        }
+                        task={task}
+                      />
                       <button
                         className="today-action-button"
                         onClick={() => void handleAddFocusTask(task)}
@@ -1300,6 +1437,12 @@ function App() {
                     >
                       {task.title}
                     </button>
+                    <QuickRescheduleButton
+                      onReschedule={(selectedTask, target) =>
+                        void handleQuickReschedule(selectedTask, target)
+                      }
+                      task={task}
+                    />
                     <button
                       aria-label={`删除任务：${task.title}`}
                       className="task-delete-button"
@@ -1492,7 +1635,9 @@ function App() {
                 ? `已添加「${lastTaskAction.task.title}」`
                 : lastTaskAction.kind === "completed"
                   ? `已完成「${lastTaskAction.task.title}」`
-                  : `已移入回收站「${lastTaskAction.task.title}」`}
+                  : lastTaskAction.kind === "rescheduled"
+                    ? `已将「${lastTaskAction.task.title}」改期到${lastTaskAction.rescheduleLabel}`
+                    : `已移入回收站「${lastTaskAction.task.title}」`}
             </span>
             <button
               disabled={isUndoingTaskAction}
