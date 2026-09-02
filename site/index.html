@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="PerfectPlan 是一款免费、离线优先的个人计划桌面应用。无账号、无服务器，让你的任务、日程和提醒始终归你所有。"
+    />
+    <meta property="og:title" content="PerfectPlan — 让计划回到你手里" />
+    <meta
+      property="og:description"
+      content="免费、离线优先的个人计划桌面应用。无账号、无服务器。"
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="theme-color" content="#f7f7f2" />
+    <title>PerfectPlan — 免费的个人计划桌面应用</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="PerfectPlan 首页">PerfectPlan<span>.</span></a>
+      <nav aria-label="主导航">
+        <a href="#features">功能</a>
+        <a href="#privacy">隐私</a>
+        <a href="#faq">常见问题</a>
+      </nav>
+      <a
+        class="header-link"
+        href="https://github.com/ssbsunshengbo/PerfectPlan"
+        target="_blank"
+        rel="noreferrer"
+        >开源项目 ↗</a
+      >
+    </header>
+
+    <main id="main">
+      <section id="top" class="hero section-shell">
+        <div class="hero-copy">
+          <p class="eyebrow">FREE · LOCAL-FIRST · DESKTOP</p>
+          <h1>把今天过好，<br /><em>从一个清晰计划开始。</em></h1>
+          <p class="hero-description">
+            PerfectPlan
+            是一款免费的个人计划桌面应用。记录任务、安排时间、得到提醒——无需注册，数据只在你的设备上。
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#download">获取 PerfectPlan <span>↓</span></a>
+            <a class="button button-quiet" href="#features">看看它能做什么 <span>→</span></a>
+          </div>
+          <p class="hero-note">适用于 macOS 与 Windows · 免费开源 · 无需账号</p>
+        </div>
+
+        <div class="app-preview" aria-label="PerfectPlan 日历界面预览">
+          <div class="preview-titlebar">
+            <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span>PerfectPlan</span>
+            <b>⌘ K</b>
+          </div>
+          <div class="preview-body">
+            <aside class="preview-sidebar">
+              <strong>PerfectPlan<span>.</span></strong>
+              <div class="preview-nav active"><span>◆</span> 今日 <b>4</b></div>
+              <div class="preview-nav"><span>□</span> 收集箱</div>
+              <div class="preview-nav"><span>⌁</span> 即将到来</div>
+              <div class="preview-nav"><span>▦</span> 日历</div>
+              <p>项目</p>
+              <div class="preview-project"><i class="project-dot purple"></i>个人成长</div>
+              <div class="preview-project"><i class="project-dot orange"></i>工作</div>
+            </aside>
+            <div class="preview-content">
+              <div class="preview-toolbar">
+                <span class="preview-crumb">日历</span>
+                <div>
+                  <button aria-label="上一个日期">‹</button
+                  ><button aria-label="下一个日期">›</button
+                  ><button class="today-button">今天</button>
+                </div>
+              </div>
+              <div class="preview-week">
+                <div><span>一</span><b>8</b></div>
+                <div><span>二</span><b>9</b></div>
+                <div class="selected"><span>三</span><b>10</b></div>
+                <div><span>四</span><b>11</b></div>
+                <div><span>五</span><b>12</b></div>
+                <div><span>六</span><b>13</b></div>
+                <div><span>日</span><b>14</b></div>
+              </div>
+              <div class="calendar-grid">
+                <div class="time-axis">
+                  <span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span
+                  ><span>13:00</span><span>14:00</span>
+                </div>
+                <div class="calendar-lines" aria-hidden="true"></div>
+                <article class="task-card focus-task">
+                  <small>09:30 · 45 分钟</small><strong>整理本周计划</strong
+                  ><span><i class="project-dot purple"></i>个人成长</span>
+                </article>
+                <article class="task-card work-task">
+                  <small>11:00 · 60 分钟</small><strong>完成项目提案</strong
+                  ><span><i class="project-dot orange"></i>工作</span>
+                </article>
+                <article class="task-card personal-task">
+                  <small>14:00 · 30 分钟</small><strong>阅读 30 分钟</strong
+                  ><span><i class="project-dot green"></i>生活</span>
+                </article>
+                <div class="now-line"><span>10:18</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust-strip" aria-label="产品承诺">
+        <p><span>01</span> 没有订阅墙</p>
+        <p><span>02</span> 不需要账号</p>
+        <p><span>03</span> 数据留在本机</p>
+        <p><span>04</span> 开源可审阅</p>
+      </section>
+
+      <section id="features" class="features section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">LESS FRICTION, MORE FOCUS</p>
+          <h2>计划该有的，<br />都不该藏在付费墙后。</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card feature-card-large">
+            <span class="feature-number">01</span>
+            <div class="feature-icon focus-icon" aria-hidden="true">✓</div>
+            <h3>快速收集，慢慢整理</h3>
+            <p>想到就记。标题是唯一必填项；项目、标签、优先级和备注，可以在需要时再补上。</p>
+          </article>
+          <article class="feature-card feature-card-dark">
+            <span class="feature-number">02</span>
+            <div class="mini-calendar" aria-hidden="true">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><b>8</b
+              ><b>9</b><b class="mini-selected">10</b><b>11</b><b>12</b>
+            </div>
+            <h3>看见一周，也看见今天</h3>
+            <p>日、周、月视图之间随时切换。把任务拖进日历，让可用时间替你说话。</p>
+          </article>
+          <article class="feature-card feature-card-peach">
+            <span class="feature-number">03</span>
+            <div class="reminder-icon" aria-hidden="true"><span>⌁</span><i></i></div>
+            <h3>提醒，但不打扰</h3>
+            <p>本地提醒支持完成、稍后提醒和打开任务。所有提示都只在你的设备上发生。</p>
+          </article>
+          <article class="feature-card feature-card-wide">
+            <span class="feature-number">04</span>
+            <div>
+              <h3>计划不是审判，<br />它应该帮你重新开始。</h3>
+              <p>未完成的任务可以一键改到今晚、明天或下周；回收站和撤销让每次调整都更安心。</p>
+            </div>
+            <div class="reschedule-demo" aria-hidden="true">
+              <span>今晚</span><span class="selected-choice">明天</span><span>下周</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="privacy" class="privacy">
+        <div class="section-shell privacy-inner">
+          <p class="eyebrow">YOUR PLAN, YOUR DATA</p>
+          <h2>你的生活，不该是别人的数据源。</h2>
+          <p>
+            PerfectPlan
+            默认离线可用。没有账号系统、没有自建服务器、没有行为追踪。任务、备注、日程和提醒只保存在你自己的设备上。
+          </p>
+          <a href="https://github.com/ssbsunshengbo/PerfectPlan" target="_blank" rel="noreferrer"
+            >查看源代码与项目说明 ↗</a
+          >
+        </div>
+      </section>
+
+      <section id="download" class="download section-shell">
+        <div>
+          <p class="eyebrow">READY WHEN YOU ARE</p>
+          <h2>从一个小计划，<br />开始你的 PerfectPlan。</h2>
+        </div>
+        <div class="download-card">
+          <p>目前正在进行公开测试准备。安装包会在 GitHub Releases 中发布。</p>
+          <a
+            class="button button-primary"
+            href="https://github.com/ssbsunshengbo/PerfectPlan/releases"
+            target="_blank"
+            rel="noreferrer"
+            >前往下载页面 <span>↗</span></a
+          >
+          <small>macOS · Windows · 免费下载</small>
+        </div>
+      </section>
+
+      <section id="faq" class="faq section-shell">
+        <div class="section-heading">
+          <p class="eyebrow">FAQ</p>
+          <h2>简单的事，<br />不需要复杂答案。</h2>
+        </div>
+        <div class="faq-list">
+          <details open>
+            <summary>PerfectPlan 真的免费吗？<span>+</span></summary>
+            <p>是。核心任务管理、项目、日历、筛选、提醒和本地数据能力都免费，没有订阅墙。</p>
+          </details>
+          <details>
+            <summary>需要注册账号吗？<span>+</span></summary>
+            <p>不需要。应用不要求账号，也不依赖服务器即可使用。</p>
+          </details>
+          <details>
+            <summary>我的数据保存在哪里？<span>+</span></summary>
+            <p>
+              数据默认保存在应用所在设备的本地 SQLite 数据库中。我们不会读取或上传你的任务内容。
+            </p>
+          </details>
+          <details>
+            <summary>支持手机或多设备同步吗？<span>+</span></summary>
+            <p>当前 MVP 专注于离线桌面体验，暂不提供账号、云同步或移动端应用。</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand" href="#top">PerfectPlan<span>.</span></a>
+      <p>免费、离线优先的个人计划工具。</p>
+      <div>
+        <a href="https://github.com/ssbsunshengbo/PerfectPlan" target="_blank" rel="noreferrer"
+          >GitHub ↗</a
+        ><a
+          href="https://github.com/ssbsunshengbo/PerfectPlan/issues"
+          target="_blank"
+          rel="noreferrer"
+          >反馈问题 ↗</a
+        >
+      </div>
+    </footer>
+  </body>
+</html>

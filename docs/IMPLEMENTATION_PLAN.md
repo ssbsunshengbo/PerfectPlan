@@ -163,7 +163,7 @@ MVP 必须让用户独立完成以下闭环：
 
 - [x] `P6-01` 配置版本、变更日志和 GitHub Release 自动化：`package.json`、Cargo 与 Tauri 配置由自动检查保持一致；手动触发的 Release 工作流依次构建 macOS 与 Windows 安装包并创建草稿 Release。macOS 默认 ad-hoc 签名，配置 Apple 证书和公证凭据后自动采用正式签名；Windows 正式签名取决于后续选定的证书服务，详见 `docs/RELEASING.md`。
 - [ ] `P6-02` 配置应用内更新检查；更新失败不影响现有版本使用。
-- [ ] `P6-03` 建设 GitHub Pages 宣传页：价值主张、截图、下载、隐私、FAQ、开源入口。
+- [~] `P6-03` 建设 GitHub Pages 宣传页：已完成可部署的价值主张、产品界面预览、Releases 下载入口、隐私承诺、FAQ 与开源入口；首个公开安装包发布前需替换为真实产品截图并在 GitHub 仓库启用 Pages。
 - [ ] `P6-04` 编写安装、常见问题、数据备份、隐私和贡献文档。
 - [ ] `P6-05` 组织 10–20 名种子用户进行两周封闭测试。
 - [ ] `P6-06` 建立 GitHub Issues 标签、反馈模板和发布阻断缺陷规则。
