@@ -3,7 +3,7 @@ use tauri_plugin_positioner::{Position, WindowExt};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, WindowEvent,
+    Emitter, Manager, PhysicalPosition, WindowEvent,
 };
 
 const DATABASE_CONNECTION: &str = "sqlite:perfectplan.db";
@@ -29,6 +29,7 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             hide_today_panel,
+            hide_tray_detail,
             open_main_from_tray,
             open_quick_add_from_tray,
             open_task_from_tray
@@ -107,6 +108,7 @@ fn toggle_tray_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("tray") {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
+            hide_tray_detail_window(app);
         } else {
             show_tray_window(app);
         }
@@ -118,7 +120,9 @@ fn hide_today_panel(app: tauri::AppHandle) -> Result<(), String> {
     app.get_webview_window("tray")
         .ok_or_else(|| "找不到今日面板窗口。".to_string())?
         .hide()
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    hide_tray_detail_window(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -141,7 +145,43 @@ fn open_quick_add_from_tray(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn open_task_from_tray(app: tauri::AppHandle, task_id: String) -> Result<(), String> {
-    open_main_from_tray(app.clone())?;
-    app.emit("tray-open-task", task_id)
+    let tray = app
+        .get_webview_window("tray")
+        .ok_or_else(|| "找不到今日面板窗口。".to_string())?;
+    let detail = app
+        .get_webview_window("tray-detail")
+        .ok_or_else(|| "找不到任务详情面板。".to_string())?;
+    let tray_position = tray.outer_position().map_err(|error| error.to_string())?;
+    let tray_size = tray.outer_size().map_err(|error| error.to_string())?;
+    let detail_size = detail.outer_size().map_err(|error| error.to_string())?;
+    let mut detail_x = tray_position.x + tray_size.width as i32 + 10;
+
+    if let Some(monitor) = tray.current_monitor().map_err(|error| error.to_string())? {
+        let monitor_right = monitor.position().x + monitor.size().width as i32;
+        if detail_x + detail_size.width as i32 > monitor_right {
+            detail_x = tray_position.x - detail_size.width as i32 - 10;
+        }
+    }
+
+    detail
+        .set_position(PhysicalPosition::new(detail_x, tray_position.y))
+        .map_err(|error| error.to_string())?;
+    detail.show().map_err(|error| error.to_string())?;
+    detail.set_focus().map_err(|error| error.to_string())?;
+    app.emit("tray-open-task-detail", task_id)
+        .map_err(|error| error.to_string())
+}
+
+fn hide_tray_detail_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("tray-detail") {
+        let _ = window.hide();
+    }
+}
+
+#[tauri::command]
+fn hide_tray_detail(app: tauri::AppHandle) -> Result<(), String> {
+    app.get_webview_window("tray-detail")
+        .ok_or_else(|| "找不到任务详情面板。".to_string())?
+        .hide()
         .map_err(|error| error.to_string())
 }

@@ -78,22 +78,6 @@ export function TrayTodayPanel() {
     }
   }
 
-  async function openMain() {
-    try {
-      await invoke("open_main_from_tray");
-    } catch (reason) {
-      setError(`无法打开完整计划：${String(reason)}`);
-    }
-  }
-
-  async function quickAdd() {
-    try {
-      await invoke("open_quick_add_from_tray");
-    } catch (reason) {
-      setError(`无法新建任务：${String(reason)}`);
-    }
-  }
-
   async function openTask(task: TaskRecord) {
     try {
       await invoke("open_task_from_tray", { taskId: task.id });
@@ -211,11 +195,9 @@ export function TrayTodayPanel() {
       )}
       {error ? <p className="tray-error">{error}</p> : null}
       <footer>
-        <button className="tray-open-main" onClick={() => void openMain()} type="button">
-          打开完整计划 <span aria-hidden="true">→</span>
-        </button>
-        <button className="tray-new-task" onClick={() => void quickAdd()} type="button">
-          在主窗口新建
+        <span>点击任务即可在此处查看和编辑</span>
+        <button className="tray-new-task" onClick={() => void hidePanel()} type="button">
+          收起
         </button>
       </footer>
     </main>

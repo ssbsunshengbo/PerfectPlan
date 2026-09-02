@@ -3001,6 +3001,20 @@ h1 {
     0 18px 42px rgb(22 33 55 / 18%),
     0 2px 7px rgb(22 33 55 / 12%);
 }
+.tray-task-detail-panel {
+  position: relative;
+  min-height: calc(100vh - 10px);
+  margin: 5px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow:
+    0 18px 42px rgb(22 33 55 / 18%),
+    0 2px 7px rgb(22 33 55 / 12%);
+  color: #30343b;
+}
 :root.tray-window,
 :root.tray-window body,
 :root.tray-window #root {
@@ -3206,4 +3220,120 @@ body:has(.tray-today-panel) #root {
 }
 .tray-today-panel footer span {
   margin-right: 2px;
+}
+.tray-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.tray-detail-kicker {
+  color: #989ca4;
+  font-size: 12px;
+  font-weight: 650;
+}
+.tray-detail-title {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #2e3137;
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -0.04em;
+}
+.tray-detail-meta {
+  min-height: 28px;
+  margin: 12px 0 16px;
+}
+.tray-detail-muted {
+  color: #a5a8af;
+  font-size: 12px;
+}
+.tray-detail-notes {
+  display: grid;
+  gap: 8px;
+  color: #989ca4;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tray-detail-notes textarea {
+  min-height: 93px;
+  resize: none;
+  border: 0;
+  border-radius: 12px;
+  outline: 0;
+  background: #f6f6f7;
+  padding: 11px 12px;
+  color: #45474c;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.tray-detail-notes textarea::placeholder {
+  color: #b3b6bc;
+}
+.tray-detail-schedule {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+  color: #989ca4;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tray-detail-schedule > div {
+  display: flex;
+  gap: 6px;
+}
+.tray-detail-schedule button {
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f4f6;
+  padding: 0 10px;
+  color: #747983;
+  font-size: 12px;
+}
+.tray-detail-schedule button:hover,
+.tray-detail-schedule button.is-active {
+  background: #e9f0ff;
+  color: #3f72e4;
+}
+.tray-detail-footer {
+  position: absolute;
+  right: 20px;
+  bottom: 17px;
+  left: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  border-top: 1px solid #f0f0f1;
+  padding-top: 11px;
+}
+.tray-detail-footer button {
+  height: 33px;
+  border-radius: 9px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 680;
+}
+.tray-detail-complete {
+  border: 1px solid #dfe2e8;
+  background: #fff;
+  color: #69707a;
+}
+.tray-detail-complete:hover {
+  border-color: #9dc2ad;
+  background: #eff8f1;
+  color: #34744b;
+}
+.tray-detail-save {
+  border: 1px solid #4779f6;
+  background: #4779f6;
+  color: #fff;
+}
+.tray-detail-save:hover {
+  border-color: #3366dd;
+  background: #3366dd;
 }

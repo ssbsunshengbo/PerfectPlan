@@ -14,6 +14,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./App.css";
 import { trapFocusInDialog, trapFocusInElement } from "./app/accessibility";
 import { TrayTodayPanel } from "./app/tray-today-panel";
+import { TrayTaskDetailPanel } from "./app/tray-task-detail-panel";
 import { getDatabaseHealth, resetDatabaseConnection } from "./features/database/database";
 import {
   CALENDAR_OVERLOAD_MINUTES,
@@ -228,7 +229,10 @@ function formatUpcomingDay(localDate: string): { day: string; weekday: string } 
 }
 
 function App() {
-  return getCurrentWindow().label === "tray" ? <TrayTodayPanel /> : <MainApp />;
+  const windowLabel = getCurrentWindow().label;
+  if (windowLabel === "tray") return <TrayTodayPanel />;
+  if (windowLabel === "tray-detail") return <TrayTaskDetailPanel />;
+  return <MainApp />;
 }
 
 function MainApp() {
@@ -326,19 +330,11 @@ function MainApp() {
 
   useEffect(() => {
     let stopQuickAdd: (() => void) | undefined;
-    let stopOpenTask: (() => void) | undefined;
     void listen("tray-open-quick-add", () => setIsQuickAddOpen(true)).then((stop) => {
       stopQuickAdd = stop;
     });
-    void listen<string>("tray-open-task", async (event) => {
-      const task = await taskService.getTask(event.payload);
-      if (task) await openTaskDetails(task);
-    }).then((stop) => {
-      stopOpenTask = stop;
-    });
     return () => {
       stopQuickAdd?.();
-      stopOpenTask?.();
     };
   }, []);
 

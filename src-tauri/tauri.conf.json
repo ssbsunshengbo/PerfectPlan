@@ -10,6 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -22,6 +23,21 @@
       {
         "label": "tray",
         "title": "今日计划 · PerfectPlan",
+        "url": "index.html",
+        "width": 356,
+        "height": 390,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focusable": true
+      },
+      {
+        "label": "tray-detail",
+        "title": "任务详情 · PerfectPlan",
         "url": "index.html",
         "width": 356,
         "height": 390,
