@@ -12,7 +12,13 @@ import {
 import "./App.css";
 import { getDatabaseHealth } from "./features/database/database";
 import {
+  CALENDAR_OVERLOAD_MINUTES,
+  getCalendarConflictTaskIds,
+  getCalendarDayLoadMinutes,
+  getCalendarTaskLayouts,
   getCalendarTimeOptions,
+  hasCalendarTimezoneMismatch,
+  isCalendarTimeOutsideGrid,
   minutesFromCalendarStartAt,
   snapCalendarDuration,
   snapCalendarStart,
@@ -1208,6 +1214,18 @@ function App() {
         ),
     ]),
   );
+  const calendarDayLoadMinutesByDate = new Map(
+    calendarDates.map((date) => [date, getCalendarDayLoadMinutes(calendarTasks, date)]),
+  );
+  const calendarTaskLayoutsById = new Map<string, { columnCount: number; columnIndex: number }>();
+  const calendarConflictTaskIds = new Set<string>();
+  calendarDates.forEach((date) => {
+    const timedTasks = calendarTimedTasksByDate.get(date) ?? [];
+    getCalendarTaskLayouts(timedTasks).forEach((layout) => {
+      calendarTaskLayoutsById.set(layout.id, layout);
+    });
+    getCalendarConflictTaskIds(timedTasks).forEach((taskId) => calendarConflictTaskIds.add(taskId));
+  });
   const calendarAllDayTasksByDate = new Map(
     calendarDates.map((date) => [
       date,
@@ -1893,6 +1911,8 @@ function App() {
                       const dueTasks = calendarTasks.filter(
                         (task) => task.dueDate === date && task.scheduledDate !== date,
                       );
+                      const isOverloaded =
+                        getCalendarDayLoadMinutes(calendarTasks, date) > CALENDAR_OVERLOAD_MINUTES;
 
                       return (
                         <div
@@ -1916,6 +1936,9 @@ function App() {
                           >
                             {toLocalDate(date).getDate()}
                           </button>
+                          {isOverloaded ? (
+                            <span className="calendar-month-overload">超载</span>
+                          ) : null}
                           {scheduledTasks.slice(0, 3).map((task) => (
                             <button
                               className="calendar-month-task"
@@ -1967,15 +1990,8 @@ function App() {
                     <span />
                     {calendarDates.map((date) => {
                       const isTodayDate = date === toLocalDateValue();
-                      const scheduledMinutes = (calendarTasksByDate?: TaskRecord[]) =>
-                        (calendarTasksByDate ?? []).reduce(
-                          (total, task) => total + (task.estimatedMinutes ?? 30),
-                          0,
-                        );
-                      const dayMinutes = scheduledMinutes([
-                        ...(calendarTimedTasksByDate.get(date) ?? []),
-                        ...(calendarAllDayTasksByDate.get(date) ?? []),
-                      ]);
+                      const dayMinutes = calendarDayLoadMinutesByDate.get(date) ?? 0;
+                      const isOverloaded = dayMinutes > CALENDAR_OVERLOAD_MINUTES;
 
                       return (
                         <div
@@ -1993,6 +2009,11 @@ function App() {
                           <small>
                             {dayMinutes > 0 ? `${Math.round(dayMinutes / 30) / 2} 小时` : ""}
                           </small>
+                          {isOverloaded ? (
+                            <span className="calendar-overload-badge" title="预计工作量超过 8 小时">
+                              超载
+                            </span>
+                          ) : null}
                         </div>
                       );
                     })}
@@ -2080,27 +2101,39 @@ function App() {
                                 task.scheduledDate &&
                                 task.scheduledDate > task.dueDate,
                               );
+                              const isConflict = calendarConflictTaskIds.has(task.id);
+                              const hasTimezoneMismatch = hasCalendarTimezoneMismatch(task);
+                              const isOutsideGrid = isCalendarTimeOutsideGrid(task);
+                              const taskLayout = calendarTaskLayoutsById.get(task.id) ?? {
+                                columnCount: 1,
+                                columnIndex: 0,
+                              };
+                              const displayedMinutes =
+                                calendarResize?.task.id === task.id
+                                  ? calendarResize.estimatedMinutes
+                                  : estimatedMinutes;
 
                               return (
                                 <div
-                                  className={
-                                    isAfterDue
-                                      ? "calendar-time-task is-after-due"
-                                      : "calendar-time-task"
-                                  }
+                                  className={[
+                                    "calendar-time-task",
+                                    isAfterDue ? "is-after-due" : "",
+                                    isConflict ? "is-conflict" : "",
+                                    hasTimezoneMismatch ? "has-timezone-mismatch" : "",
+                                    isOutsideGrid ? "is-outside-grid" : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
                                   draggable={calendarResize?.task.id !== task.id}
                                   key={task.id}
                                   onDragStart={(event) => startCalendarDrag(event, task)}
                                   style={
                                     {
                                       "--task-color": calendarTaskColor(task),
-                                      height: `${Math.max(
-                                        calendarResize?.task.id === task.id
-                                          ? calendarResize.estimatedMinutes
-                                          : estimatedMinutes,
-                                        30,
-                                      )}px`,
+                                      height: `${Math.max(displayedMinutes, 30)}px`,
+                                      left: `${5 + (90 * taskLayout.columnIndex) / taskLayout.columnCount}%`,
                                       top: `${offsetMinutes}px`,
+                                      width: `${90 / taskLayout.columnCount}%`,
                                     } as CSSProperties
                                   }
                                 >
@@ -2114,7 +2147,9 @@ function App() {
                                   >
                                     <span>{formatCalendarTime(task.scheduledStartAt)}</span>
                                     <strong>{task.title}</strong>
-                                    <small>{`${calendarResize?.task.id === task.id ? calendarResize.estimatedMinutes : estimatedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}`}</small>
+                                    <small>
+                                      {`${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
+                                    </small>
                                   </button>
                                   <button
                                     aria-label={`拉伸「${task.title}」的时长`}

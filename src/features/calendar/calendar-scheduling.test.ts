@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   CALENDAR_LAST_START_MINUTES,
+  getCalendarConflictTaskIds,
+  getCalendarDayLoadMinutes,
+  getCalendarTaskLayouts,
   getCalendarTimeOptions,
+  hasCalendarTimezoneMismatch,
+  isCalendarTimeOutsideGrid,
   minutesFromCalendarStartAt,
   snapCalendarDuration,
   snapCalendarStart,
@@ -38,5 +43,77 @@ describe("calendar scheduling", () => {
       label: "23:30",
       value: CALENDAR_LAST_START_MINUTES,
     });
+  });
+
+  it("counts all planned work for the day, including all-day tasks", () => {
+    expect(
+      getCalendarDayLoadMinutes(
+        [
+          { estimatedMinutes: 90, id: "timed", scheduledDate: "2026-09-02", scheduledStartAt: "x" },
+          {
+            estimatedMinutes: null,
+            id: "all-day",
+            scheduledDate: "2026-09-02",
+            scheduledStartAt: null,
+          },
+          {
+            estimatedMinutes: 120,
+            id: "other-day",
+            scheduledDate: "2026-09-03",
+            scheduledStartAt: null,
+          },
+        ],
+        "2026-09-02",
+      ),
+    ).toBe(120);
+  });
+
+  it("marks overlapping blocks and lays them out side by side", () => {
+    const tasks = [
+      {
+        estimatedMinutes: 60,
+        id: "first",
+        scheduledDate: "2026-09-02",
+        scheduledStartAt: toCalendarStartAt("2026-09-02", 9 * 60),
+      },
+      {
+        estimatedMinutes: 60,
+        id: "second",
+        scheduledDate: "2026-09-02",
+        scheduledStartAt: toCalendarStartAt("2026-09-02", 9 * 60 + 30),
+      },
+      {
+        estimatedMinutes: 30,
+        id: "third",
+        scheduledDate: "2026-09-02",
+        scheduledStartAt: toCalendarStartAt("2026-09-02", 11 * 60),
+      },
+    ];
+
+    expect(getCalendarConflictTaskIds(tasks)).toEqual(new Set(["first", "second"]));
+    expect(getCalendarTaskLayouts(tasks)).toEqual([
+      { columnCount: 2, columnIndex: 0, id: "first" },
+      { columnCount: 2, columnIndex: 1, id: "second" },
+      { columnCount: 1, columnIndex: 0, id: "third" },
+    ]);
+  });
+
+  it("identifies timezone-mismatched and out-of-grid legacy time blocks", () => {
+    const mismatched = {
+      estimatedMinutes: 30,
+      id: "mismatch",
+      scheduledDate: "1999-01-01",
+      scheduledStartAt: toCalendarStartAt("2026-09-02", 9 * 60),
+    };
+
+    expect(hasCalendarTimezoneMismatch(mismatched)).toBe(true);
+    expect(
+      isCalendarTimeOutsideGrid({
+        ...mismatched,
+        estimatedMinutes: 60,
+        scheduledDate: "2026-09-02",
+        scheduledStartAt: toCalendarStartAt("2026-09-02", 23 * 60 + 30),
+      }),
+    ).toBe(true);
   });
 });
