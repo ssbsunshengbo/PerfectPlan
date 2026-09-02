@@ -1,41 +1,41 @@
-name: Bug report
-description: Report a reproducible problem in PerfectPlan.
-labels: [bug, needs-triage]
+name: 缺陷报告
+description: 报告一个可复现的问题；请勿包含真实任务内容或数据库文件。
+labels: ["type: bug", "status: needs-triage"]
 body:
   - type: markdown
     attributes:
-      value: Thank you for helping improve PerfectPlan. Please do not include private task content.
+      value: 感谢帮助改进 PerfectPlan。请勿粘贴私人任务内容、数据库文件、证书或令牌。
   - type: textarea
     id: summary
     attributes:
-      label: What happened?
-      description: Describe the actual result and the expected result.
+      label: 发生了什么？
+      description: 请说明实际结果和你预期的结果。
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to reproduce
+      label: 复现步骤
       placeholder: |
-        1. Open …
-        2. Create …
-        3. Observe …
+        1. 打开 …
+        2. 创建或操作 …
+        3. 观察到 …
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: PerfectPlan version
+      label: PerfectPlan 版本
       placeholder: 0.1.0
     validations:
       required: true
   - type: dropdown
     id: platform
     attributes:
-      label: Platform
+      label: 系统平台
       options:
         - macOS
         - Windows
-        - Other
+        - 其他
     validations:
       required: true

@@ -1,18 +1,18 @@
-name: Feature request
-description: Suggest an improvement to PerfectPlan.
-labels: [feature, needs-triage]
+name: 功能建议
+description: 提出一个以个人计划体验为中心的改进建议。
+labels: ["type: feature", "status: needs-triage"]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: What problem would this solve?
-      description: Describe the planning problem before suggesting a solution.
+      label: 这个建议解决什么问题？
+      description: 请先描述你的计划问题，再提出具体做法。
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed experience
-      description: Explain how the feature should feel from a user's perspective.
+      label: 你希望的使用体验
+      description: 请从使用者的角度说明它应该怎样工作。
     validations:
       required: true

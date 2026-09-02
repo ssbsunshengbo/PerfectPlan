@@ -1,0 +1,30 @@
+name: 使用反馈
+description: 分享使用体验、困惑或改进建议，无需填写完整的缺陷复现步骤。
+labels: ["type: feedback", "status: needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: 感谢你试用 PerfectPlan。请使用示例任务名称，不要附上真实任务、数据库、证书或任何敏感信息。
+  - type: textarea
+    id: context
+    attributes:
+      label: 你当时想完成什么？
+      description: 例如“安排下周的学习时间”或“快速记下临时待办”。
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: 哪些地方顺畅，哪些地方让你困惑？
+    validations:
+      required: true
+  - type: dropdown
+    id: likelihood
+    attributes:
+      label: 你愿意继续使用 PerfectPlan 吗？
+      options:
+        - 愿意
+        - 取决于后续改进
+        - 暂时不会
+    validations:
+      required: true

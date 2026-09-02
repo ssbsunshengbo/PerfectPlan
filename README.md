@@ -37,6 +37,7 @@ See [the release guide](./docs/RELEASING.md) for versioning, signing, notarizati
 - [Installation and backup guide](./docs/INSTALLATION.md)
 - [Privacy policy](./docs/PRIVACY.md)
 - [Frequently asked questions](./docs/FAQ.md)
+- [Issue triage and release blockers](./docs/ISSUE_TRIAGE.md)
 - [Changelog](./CHANGELOG.md)
 
 ## License
