@@ -50,8 +50,8 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgb(39 101 79 / 26%);
-  outline-offset: 2px;
+  outline: 3px solid #27654f;
+  outline-offset: 3px;
 }
 
 .app-shell {
@@ -335,6 +335,16 @@ h1 {
 @keyframes plan-spin {
   to {
     transform: rotate(1turn);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 .empty-state {

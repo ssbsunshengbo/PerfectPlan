@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 
+import { trapFocusInDialog } from "../../app/accessibility";
 import type { ProjectRecord } from "../projects/project-types";
 import type { NotificationPermissionState } from "../reminders/notification-service";
 import type { ReminderRecord } from "../reminders/reminder-types";
@@ -535,6 +536,7 @@ export function TaskDetailDialog({
         className="task-details-dialog"
         role="dialog"
         onKeyDown={(event) => {
+          trapFocusInDialog(event);
           if (event.key === "Escape" && !isSaving) onClose();
         }}
       >

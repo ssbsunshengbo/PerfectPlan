@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import "./App.css";
+import { trapFocusInDialog, trapFocusInElement } from "./app/accessibility";
 import { getDatabaseHealth, resetDatabaseConnection } from "./features/database/database";
 import {
   CALENDAR_OVERLOAD_MINUTES,
@@ -291,6 +292,47 @@ function App() {
   const [activeReminderActionId, setActiveReminderActionId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isSearchComposingRef = useRef(false);
+  const lastBackgroundFocusRef = useRef<HTMLElement | null>(null);
+  const wasModalOpenRef = useRef(false);
+  const isModalOpen = Boolean(
+    isQuickAddOpen ||
+    isProjectCreateOpen ||
+    selectedProject ||
+    selectedTask ||
+    pendingTaskDeletion ||
+    isDailyReviewOpen ||
+    calendarScheduleDraft,
+  );
+
+  useEffect(() => {
+    function keepFocusInOpenDialog(event: KeyboardEvent) {
+      const dialogs = document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]');
+      const activeDialog = dialogs[dialogs.length - 1];
+      if (activeDialog) trapFocusInElement(activeDialog, event);
+    }
+
+    document.addEventListener("keydown", keepFocusInOpenDialog, true);
+    return () => document.removeEventListener("keydown", keepFocusInOpenDialog, true);
+  }, []);
+
+  useEffect(() => {
+    function rememberBackgroundFocus(event: FocusEvent) {
+      const hasOpenDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+      if (!hasOpenDialog && event.target instanceof HTMLElement) {
+        lastBackgroundFocusRef.current = event.target;
+      }
+    }
+
+    document.addEventListener("focusin", rememberBackgroundFocus);
+    return () => document.removeEventListener("focusin", rememberBackgroundFocus);
+  }, []);
+
+  useEffect(() => {
+    if (!isModalOpen && wasModalOpenRef.current) {
+      window.requestAnimationFrame(() => lastBackgroundFocusRef.current?.focus());
+    }
+    wasModalOpenRef.current = isModalOpen;
+  }, [isModalOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1493,6 +1535,7 @@ function App() {
             {navigationItems.map((item) => (
               <li key={item}>
                 <button
+                  aria-current={item === activeView ? "page" : undefined}
                   className={item === activeView ? "nav-item is-active" : "nav-item"}
                   disabled={databaseState !== "ready"}
                   onClick={() => void handleNavigation(item)}
@@ -2890,6 +2933,7 @@ function App() {
             className="quick-add-dialog"
             role="dialog"
             onKeyDown={(event) => {
+              trapFocusInDialog(event);
               if (event.key === "Escape") closeQuickAdd();
             }}
           >
@@ -2942,6 +2986,7 @@ function App() {
             className="calendar-schedule-dialog"
             role="dialog"
             onKeyDown={(event) => {
+              trapFocusInDialog(event);
               if (event.key === "Escape" && !isSavingCalendarSchedule) {
                 setCalendarScheduleDraft(null);
                 setTaskError(null);
@@ -3085,6 +3130,7 @@ function App() {
             className="confirmation-dialog"
             role="dialog"
             onKeyDown={(event) => {
+              trapFocusInDialog(event);
               if (event.key === "Escape") setPendingTaskDeletion(null);
             }}
           >
@@ -3154,6 +3200,7 @@ function App() {
             className="daily-review-dialog"
             role="dialog"
             onKeyDown={(event) => {
+              trapFocusInDialog(event);
               if (event.key === "Escape" && !isSavingDailyReview) setIsDailyReviewOpen(false);
             }}
           >
@@ -3240,6 +3287,10 @@ function App() {
             aria-modal="true"
             className="quick-add-dialog"
             role="dialog"
+            onKeyDown={(event) => {
+              trapFocusInDialog(event);
+              if (event.key === "Escape" && !isSavingProject) setIsProjectCreateOpen(false);
+            }}
           >
             <div className="quick-add-header">
               <div>
@@ -3292,6 +3343,10 @@ function App() {
             aria-modal="true"
             className="quick-add-dialog"
             role="dialog"
+            onKeyDown={(event) => {
+              trapFocusInDialog(event);
+              if (event.key === "Escape" && !isSavingProject) setSelectedProject(null);
+            }}
           >
             <div className="quick-add-header">
               <div>
