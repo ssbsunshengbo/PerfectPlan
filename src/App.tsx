@@ -8,9 +8,12 @@ import {
   useRef,
   useState,
 } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import "./App.css";
 import { trapFocusInDialog, trapFocusInElement } from "./app/accessibility";
+import { TrayTodayPanel } from "./app/tray-today-panel";
 import { getDatabaseHealth, resetDatabaseConnection } from "./features/database/database";
 import {
   CALENDAR_OVERLOAD_MINUTES,
@@ -225,6 +228,10 @@ function formatUpcomingDay(localDate: string): { day: string; weekday: string } 
 }
 
 function App() {
+  return getCurrentWindow().label === "tray" ? <TrayTodayPanel /> : <MainApp />;
+}
+
+function MainApp() {
   const [databaseState, setDatabaseState] = useState<DatabaseState>("loading");
   const [databaseMessage, setDatabaseMessage] = useState("正在准备本地数据库…");
   const [databaseAttempt, setDatabaseAttempt] = useState(0);
@@ -315,6 +322,14 @@ function App() {
 
     document.addEventListener("keydown", keepFocusInOpenDialog, true);
     return () => document.removeEventListener("keydown", keepFocusInOpenDialog, true);
+  }, []);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen("tray-open-quick-add", () => setIsQuickAddOpen(true)).then((stop) => {
+      unlisten = stop;
+    });
+    return () => unlisten?.();
   }, []);
 
   useEffect(() => {

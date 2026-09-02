@@ -12,11 +12,24 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "PerfectPlan",
         "width": 1200,
         "height": 800,
         "minWidth": 960,
         "minHeight": 640
+      },
+      {
+        "label": "tray",
+        "title": "今日计划 · PerfectPlan",
+        "url": "index.html",
+        "width": 360,
+        "height": 430,
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false
       }
     ],
     "security": {

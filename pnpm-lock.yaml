@@ -13,6 +13,9 @@ importers:
       "@tauri-apps/plugin-notification":
         specifier: ^2.4.0
         version: 2.4.0
+      "@tauri-apps/plugin-positioner":
+        specifier: ^2.3.4
+        version: 2.3.4
       "@tauri-apps/plugin-sql":
         specifier: ~2.4.0
         version: 2.4.0
@@ -927,6 +930,12 @@ packages:
     resolution:
       {
         integrity: sha512-xlJXMcUoKOjNupzDue5wrEsa1wytf+l/2gCAPhafHyP683Y3N7J/8clUWLZ3vpnwkpT2C1zcLMMQFjjecIG2xg==,
+      }
+
+  "@tauri-apps/plugin-positioner@2.3.4":
+    resolution:
+      {
+        integrity: sha512-Orl+BWL/93OuxaL8FE/5tk7RuRyGMfEQX6E2fDsErFaahHCYq/REFByRBm8oWzw7bIfWdlOY/B6CZMcYgC+crg==,
       }
 
   "@tauri-apps/plugin-sql@2.4.0":
@@ -2424,6 +2433,10 @@ snapshots:
       "@tauri-apps/cli-win32-x64-msvc": 2.11.4
 
   "@tauri-apps/plugin-notification@2.4.0":
+    dependencies:
+      "@tauri-apps/api": 2.11.1
+
+  "@tauri-apps/plugin-positioner@2.3.4":
     dependencies:
       "@tauri-apps/api": 2.11.1
 
