@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, useEffect, useRef, useState } from "react";
 
 import "./App.css";
 import { getDatabaseHealth } from "./features/database/database";
@@ -24,6 +24,7 @@ type ReversibleTaskAction = {
 };
 
 type QuickRescheduleTarget = "tonight" | "tomorrow" | "nextWeek" | "unscheduled";
+type CalendarViewMode = "day" | "month" | "week";
 
 const quickRescheduleOptions: Array<{ label: string; target: QuickRescheduleTarget }> = [
   { label: "今晚", target: "tonight" },
@@ -64,6 +65,40 @@ function nextMonday(localDate: string): string {
   const date = toLocalDate(localDate);
   const weekday = date.getDay() || 7;
   return addDays(localDate, 8 - weekday);
+}
+
+function startOfWeek(localDate: string): string {
+  const weekday = (toLocalDate(localDate).getDay() + 6) % 7;
+  return addDays(localDate, -weekday);
+}
+
+function addMonths(localDate: string, amount: number): string {
+  const date = toLocalDate(localDate);
+  date.setDate(1);
+  date.setMonth(date.getMonth() + amount);
+  return toLocalDateValue(date);
+}
+
+function formatCalendarDay(localDate: string, withWeekday = true): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    day: "numeric",
+    month: "numeric",
+    ...(withWeekday ? { weekday: "short" } : {}),
+  }).format(toLocalDate(localDate));
+}
+
+function formatCalendarTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function calendarTimeOffset(value: string | null): number {
+  if (!value) return 0;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(0, (date.getHours() - 6) * 60 + date.getMinutes());
 }
 
 function QuickRescheduleButton({
@@ -141,6 +176,11 @@ function App() {
   const [isCompletedTodayExpanded, setIsCompletedTodayExpanded] = useState(false);
   const [upcomingStartDate, setUpcomingStartDate] = useState(() => toLocalDateValue());
   const [upcomingTasks, setUpcomingTasks] = useState<TaskRecord[]>([]);
+  const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>("week");
+  const [calendarAnchorDate, setCalendarAnchorDate] = useState(() => toLocalDateValue());
+  const [calendarTasks, setCalendarTasks] = useState<TaskRecord[]>([]);
+  const [calendarFocusTasks, setCalendarFocusTasks] = useState<TaskRecord[]>([]);
+  const [calendarOverdueTasks, setCalendarOverdueTasks] = useState<TaskRecord[]>([]);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInputValue, setSearchInputValue] = useState("");
@@ -287,6 +327,19 @@ function App() {
     setUpcomingTasks(upcoming);
   }
 
+  async function loadCalendarTasks() {
+    const today = toLocalDateValue();
+    const [activeTasks, focusTasks, overdueTasks] = await Promise.all([
+      taskService.listActiveTasks(),
+      dailyPlanService.listFocusTasks(today),
+      taskService.listOverdueActiveTasks(today),
+    ]);
+
+    setCalendarTasks(activeTasks);
+    setCalendarFocusTasks(focusTasks);
+    setCalendarOverdueTasks(overdueTasks);
+  }
+
   function closeQuickAdd() {
     if (isSavingTask) return;
     setIsQuickAddOpen(false);
@@ -338,6 +391,7 @@ function App() {
       });
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
+      if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新任务失败，请重试。");
     }
@@ -381,6 +435,7 @@ function App() {
       await loadInboxTasks();
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
+      if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "改期失败，请重试。");
     }
@@ -478,6 +533,7 @@ function App() {
       setSelectedTask(null);
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
+      if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "保存任务失败，请重试。");
     } finally {
@@ -598,6 +654,7 @@ function App() {
       setPendingTaskDeletion(null);
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
+      if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "删除任务失败，请重试。");
     }
@@ -614,6 +671,7 @@ function App() {
       if (activeView === "收集箱") await loadInboxTasks();
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
+      if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "恢复任务失败，请重试。");
     }
@@ -637,6 +695,7 @@ function App() {
         await loadInboxTasks();
         if (activeView === "今日") await loadTodayTasks();
         if (activeView === "即将到来") await loadUpcomingTasks();
+        if (activeView === "日历") await loadCalendarTasks();
       } else {
         if (lastTaskAction.kind === "completed" && lastTaskAction.nextRecurringTaskId) {
           await taskService.undoRecurringCompletion(
@@ -650,6 +709,7 @@ function App() {
           currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
         );
         await loadInboxTasks();
+        if (activeView === "日历") await loadCalendarTasks();
       }
       setLastTaskAction(null);
     } catch (error) {
@@ -667,6 +727,7 @@ function App() {
       if (item === "收集箱") await loadInboxTasks();
       if (item === "今日") await loadTodayTasks();
       if (item === "即将到来") await loadUpcomingTasks();
+      if (item === "日历") await loadCalendarTasks();
       if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
@@ -695,6 +756,18 @@ function App() {
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取即将到来的任务，请重试。");
     }
+  }
+
+  function handleCalendarNavigation(direction: -1 | 1) {
+    setCalendarAnchorDate((currentDate) =>
+      calendarViewMode === "month"
+        ? addMonths(currentDate, direction)
+        : addDays(currentDate, calendarViewMode === "week" ? direction * 7 : direction),
+    );
+  }
+
+  function handleCalendarToday() {
+    setCalendarAnchorDate(toLocalDateValue());
   }
 
   async function handleAddFocusTask(task: TaskRecord) {
@@ -852,6 +925,7 @@ function App() {
   const isToday = activeView === "今日";
   const isInbox = activeView === "收集箱";
   const isUpcoming = activeView === "即将到来";
+  const isCalendar = activeView === "日历";
   const isProjects = activeView === "项目";
   const isTags = activeView === "标签";
   const isTrash = activeView === "回收站";
@@ -872,6 +946,62 @@ function App() {
   const todayLabel = formatTodayLabel(toLocalDateValue());
   const upcomingEndDate = addDays(upcomingStartDate, 6);
   const upcomingDates = Array.from({ length: 7 }, (_, index) => addDays(upcomingStartDate, index));
+  const calendarWeekStart = startOfWeek(calendarAnchorDate);
+  const calendarMonthStart = (() => {
+    const date = toLocalDate(calendarAnchorDate);
+    date.setDate(1);
+    return toLocalDateValue(date);
+  })();
+  const calendarMonthDates = Array.from({ length: 42 }, (_, index) =>
+    addDays(startOfWeek(calendarMonthStart), index),
+  );
+  const calendarDates =
+    calendarViewMode === "week"
+      ? Array.from({ length: 7 }, (_, index) => addDays(calendarWeekStart, index))
+      : [calendarAnchorDate];
+  const calendarTimedTasksByDate = new Map(
+    calendarDates.map((date) => [
+      date,
+      calendarTasks
+        .filter((task) => task.scheduledDate === date && task.scheduledStartAt)
+        .sort((left, right) =>
+          (left.scheduledStartAt ?? "").localeCompare(right.scheduledStartAt ?? ""),
+        ),
+    ]),
+  );
+  const calendarAllDayTasksByDate = new Map(
+    calendarDates.map((date) => [
+      date,
+      calendarTasks
+        .filter((task) => task.scheduledDate === date && !task.scheduledStartAt)
+        .sort(
+          (left, right) =>
+            right.priority - left.priority || left.createdAt.localeCompare(right.createdAt),
+        ),
+    ]),
+  );
+  const calendarCandidateTasks = [...calendarTasks]
+    .filter(
+      (task) =>
+        !task.scheduledDate ||
+        calendarFocusTasks.some((focusTask) => focusTask.id === task.id) ||
+        calendarOverdueTasks.some((overdueTask) => overdueTask.id === task.id),
+    )
+    .sort((left, right) => {
+      const sourceRank = (task: TaskRecord) =>
+        calendarOverdueTasks.some((overdueTask) => overdueTask.id === task.id)
+          ? 0
+          : calendarFocusTasks.some((focusTask) => focusTask.id === task.id)
+            ? 1
+            : 2;
+      return (
+        sourceRank(left) - sourceRank(right) ||
+        right.priority - left.priority ||
+        left.createdAt.localeCompare(right.createdAt)
+      );
+    });
+  const calendarHours = Array.from({ length: 18 }, (_, index) => index + 6);
+  const calendarBoardMinWidth = calendarViewMode === "week" ? 670 : 360;
 
   function upcomingDisplayDate(task: TaskRecord): string | null {
     if (
@@ -885,6 +1015,10 @@ function App() {
     return task.dueDate && task.dueDate >= upcomingStartDate && task.dueDate <= upcomingEndDate
       ? task.dueDate
       : null;
+  }
+
+  function calendarTaskColor(task: TaskRecord): string {
+    return projects.find((project) => project.id === task.projectId)?.color ?? "#8bad99";
   }
 
   async function handleMoveProject(projectId: string, direction: -1 | 1) {
@@ -1418,6 +1552,344 @@ function App() {
                 ) : null}
               </section>
             ) : null}
+          </section>
+        ) : isCalendar ? (
+          <section aria-labelledby="calendar-view-title" className="calendar-view">
+            <div className="calendar-toolbar">
+              <div>
+                <p className="eyebrow">时间安排</p>
+                <h2 id="calendar-view-title">
+                  {calendarViewMode === "week"
+                    ? `${formatCalendarDay(calendarDates[0] ?? calendarAnchorDate)} — ${formatCalendarDay(
+                        calendarDates[calendarDates.length - 1] ?? calendarAnchorDate,
+                      )}`
+                    : calendarViewMode === "month"
+                      ? new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(
+                          toLocalDate(calendarAnchorDate),
+                        )
+                      : formatTodayLabel(calendarAnchorDate)}
+                </h2>
+              </div>
+              <div className="calendar-toolbar-actions">
+                <div aria-label="切换日历日期" className="calendar-nav-actions">
+                  <button
+                    aria-label={
+                      calendarViewMode === "week"
+                        ? "查看上一周"
+                        : calendarViewMode === "month"
+                          ? "查看上个月"
+                          : "查看前一天"
+                    }
+                    className="range-nav-button"
+                    onClick={() => handleCalendarNavigation(-1)}
+                    type="button"
+                  >
+                    ‹
+                  </button>
+                  <button className="secondary-button" onClick={handleCalendarToday} type="button">
+                    今天
+                  </button>
+                  <button
+                    aria-label={
+                      calendarViewMode === "week"
+                        ? "查看下一周"
+                        : calendarViewMode === "month"
+                          ? "查看下个月"
+                          : "查看后一天"
+                    }
+                    className="range-nav-button"
+                    onClick={() => handleCalendarNavigation(1)}
+                    type="button"
+                  >
+                    ›
+                  </button>
+                </div>
+                <div aria-label="切换日历视图" className="calendar-view-switcher">
+                  <button
+                    aria-pressed={calendarViewMode === "month"}
+                    onClick={() => setCalendarViewMode("month")}
+                    type="button"
+                  >
+                    月
+                  </button>
+                  <button
+                    aria-pressed={calendarViewMode === "week"}
+                    onClick={() => setCalendarViewMode("week")}
+                    type="button"
+                  >
+                    周
+                  </button>
+                  <button
+                    aria-pressed={calendarViewMode === "day"}
+                    onClick={() => setCalendarViewMode("day")}
+                    type="button"
+                  >
+                    日
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="calendar-layout">
+              {calendarViewMode === "month" ? (
+                <div className="calendar-month-board">
+                  <div className="calendar-month-weekdays" aria-hidden="true">
+                    {["一", "二", "三", "四", "五", "六", "日"].map((weekday) => (
+                      <span key={weekday}>{weekday}</span>
+                    ))}
+                  </div>
+                  <div className="calendar-month-grid">
+                    {calendarMonthDates.map((date) => {
+                      const isCurrentMonth = date.slice(0, 7) === calendarMonthStart.slice(0, 7);
+                      const isTodayDate = date === toLocalDateValue();
+                      const scheduledTasks = calendarTasks
+                        .filter((task) => task.scheduledDate === date)
+                        .sort(
+                          (left, right) =>
+                            Number(Boolean(right.scheduledStartAt)) -
+                              Number(Boolean(left.scheduledStartAt)) ||
+                            right.priority - left.priority ||
+                            left.createdAt.localeCompare(right.createdAt),
+                        );
+                      const dueTasks = calendarTasks.filter(
+                        (task) => task.dueDate === date && task.scheduledDate !== date,
+                      );
+
+                      return (
+                        <div
+                          className={
+                            isCurrentMonth ? "calendar-month-day" : "calendar-month-day is-outside"
+                          }
+                          key={date}
+                        >
+                          <button
+                            aria-label={`查看${formatCalendarDay(date)}`}
+                            className={
+                              isTodayDate ? "calendar-month-date is-today" : "calendar-month-date"
+                            }
+                            onClick={() => {
+                              setCalendarAnchorDate(date);
+                              setCalendarViewMode("day");
+                            }}
+                            type="button"
+                          >
+                            {toLocalDate(date).getDate()}
+                          </button>
+                          {scheduledTasks.slice(0, 3).map((task) => (
+                            <button
+                              className="calendar-month-task"
+                              key={task.id}
+                              onClick={() => void openTaskDetails(task)}
+                              style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
+                              type="button"
+                            >
+                              {task.scheduledStartAt
+                                ? `${formatCalendarTime(task.scheduledStartAt)} `
+                                : ""}
+                              {task.title}
+                            </button>
+                          ))}
+                          {scheduledTasks.length > 3 ? (
+                            <button
+                              className="calendar-month-more"
+                              onClick={() => {
+                                setCalendarAnchorDate(date);
+                                setCalendarViewMode("day");
+                              }}
+                              type="button"
+                            >
+                              +{scheduledTasks.length - 3} 项
+                            </button>
+                          ) : null}
+                          {dueTasks.slice(0, 1).map((task) => (
+                            <span className="calendar-month-due" key={task.id}>
+                              截止 {task.title}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="calendar-board">
+                  <div
+                    className="calendar-day-headings"
+                    style={{
+                      gridTemplateColumns: `54px repeat(${calendarDates.length}, minmax(88px, 1fr))`,
+                      minWidth: `${calendarBoardMinWidth}px`,
+                    }}
+                  >
+                    <span />
+                    {calendarDates.map((date) => {
+                      const isTodayDate = date === toLocalDateValue();
+                      const scheduledMinutes = (calendarTasksByDate?: TaskRecord[]) =>
+                        (calendarTasksByDate ?? []).reduce(
+                          (total, task) => total + (task.estimatedMinutes ?? 30),
+                          0,
+                        );
+                      const dayMinutes = scheduledMinutes([
+                        ...(calendarTimedTasksByDate.get(date) ?? []),
+                        ...(calendarAllDayTasksByDate.get(date) ?? []),
+                      ]);
+
+                      return (
+                        <div
+                          className={
+                            isTodayDate ? "calendar-day-heading is-today" : "calendar-day-heading"
+                          }
+                          key={date}
+                        >
+                          <strong>
+                            {new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(
+                              toLocalDate(date),
+                            )}
+                          </strong>
+                          <span>{formatCalendarDay(date, false)}</span>
+                          <small>
+                            {dayMinutes > 0 ? `${Math.round(dayMinutes / 30) / 2} 小时` : ""}
+                          </small>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    className="calendar-all-day-row"
+                    style={{
+                      gridTemplateColumns: `54px repeat(${calendarDates.length}, minmax(88px, 1fr))`,
+                      minWidth: `${calendarBoardMinWidth}px`,
+                    }}
+                  >
+                    <span className="calendar-all-day-label">全天</span>
+                    {calendarDates.map((date) => {
+                      const allDayTasks = calendarAllDayTasksByDate.get(date) ?? [];
+
+                      return (
+                        <div className="calendar-all-day-cell" key={date}>
+                          {allDayTasks.length > 0 ? (
+                            allDayTasks.map((task) => (
+                              <button
+                                className="calendar-all-day-task"
+                                key={task.id}
+                                onClick={() => void openTaskDetails(task)}
+                                style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
+                                type="button"
+                              >
+                                <span>{task.priority === 3 ? "高" : "全天"}</span>
+                                {task.title}
+                              </button>
+                            ))
+                          ) : (
+                            <span className="calendar-empty-day">尚未安排</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    className="calendar-time-area"
+                    style={{ minWidth: `${calendarBoardMinWidth}px` }}
+                  >
+                    <div className="calendar-time-axis" aria-hidden="true">
+                      {calendarHours.map((hour) => (
+                        <span key={hour}>{`${String(hour).padStart(2, "0")}:00`}</span>
+                      ))}
+                    </div>
+                    <div
+                      className="calendar-time-columns"
+                      style={{
+                        gridTemplateColumns: `repeat(${calendarDates.length}, minmax(88px, 1fr))`,
+                      }}
+                    >
+                      {calendarDates.map((date) => {
+                        const timedTasks = calendarTimedTasksByDate.get(date) ?? [];
+
+                        return (
+                          <div className="calendar-time-column" key={date}>
+                            {timedTasks.map((task) => {
+                              const estimatedMinutes = task.estimatedMinutes ?? 30;
+                              const offsetMinutes = calendarTimeOffset(task.scheduledStartAt);
+                              const isAfterDue = Boolean(
+                                task.dueDate &&
+                                task.scheduledDate &&
+                                task.scheduledDate > task.dueDate,
+                              );
+
+                              return (
+                                <button
+                                  aria-label={`${formatCalendarTime(task.scheduledStartAt)}，${task.title}`}
+                                  className={
+                                    isAfterDue
+                                      ? "calendar-time-task is-after-due"
+                                      : "calendar-time-task"
+                                  }
+                                  key={task.id}
+                                  onClick={() => void openTaskDetails(task)}
+                                  style={
+                                    {
+                                      "--task-color": calendarTaskColor(task),
+                                      height: `${Math.max(estimatedMinutes, 30)}px`,
+                                      top: `${offsetMinutes}px`,
+                                    } as CSSProperties
+                                  }
+                                  type="button"
+                                >
+                                  <span>{formatCalendarTime(task.scheduledStartAt)}</span>
+                                  <strong>{task.title}</strong>
+                                  <small>{`${estimatedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}`}</small>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <aside aria-labelledby="calendar-candidates-title" className="calendar-candidates">
+                <div>
+                  <p className="eyebrow">待安排</p>
+                  <h3 id="calendar-candidates-title">先决定放在哪天</h3>
+                  <p>拖入日历将在下一步开放；现在可打开详情安排日期与时间。</p>
+                </div>
+                {calendarCandidateTasks.length > 0 ? (
+                  <ul>
+                    {calendarCandidateTasks.map((task) => {
+                      const isOverdue = calendarOverdueTasks.some(
+                        (overdueTask) => overdueTask.id === task.id,
+                      );
+                      const isFocus = calendarFocusTasks.some(
+                        (focusTask) => focusTask.id === task.id,
+                      );
+
+                      return (
+                        <li key={task.id}>
+                          <button
+                            className="calendar-candidate-task"
+                            onClick={() => void openTaskDetails(task)}
+                            style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
+                            type="button"
+                          >
+                            <strong>{task.title}</strong>
+                            <span>{isOverdue ? "已逾期" : isFocus ? "今日重点" : "未安排"}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="calendar-candidates-empty">
+                    <span aria-hidden="true">✦</span>
+                    <strong>暂时没有待安排任务</strong>
+                    <p>收集箱与今日重点会显示在这里。</p>
+                  </div>
+                )}
+              </aside>
+            </div>
           </section>
         ) : isInbox && tasks.length === 0 && !hasInboxFilters ? (
           <section className="empty-state" aria-labelledby="empty-state-title">
