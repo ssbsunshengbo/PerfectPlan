@@ -7,9 +7,9 @@ import { projectService, type UpdateProjectInput } from "./features/projects/pro
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
 import type { TagRecord } from "./features/tags/tag-types";
-import { TaskDetailDialog } from "./features/tasks/task-detail-dialog";
-import { taskService, type UpdateTaskInput } from "./features/tasks/task-service";
-import type { TaskPriority, TaskRecord } from "./features/tasks/task-types";
+import { TaskDetailDialog, type TaskDetailSaveInput } from "./features/tasks/task-detail-dialog";
+import { taskService } from "./features/tasks/task-service";
+import type { RecurrenceRule, TaskPriority, TaskRecord } from "./features/tasks/task-types";
 
 type DatabaseState = "loading" | "ready" | "error";
 
@@ -17,6 +17,7 @@ const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项�
 type NavigationItem = (typeof navigationItems)[number];
 type ReversibleTaskAction = {
   kind: "created" | "completed" | "trashed";
+  nextRecurringTaskId?: string | null;
   task: Pick<TaskRecord, "id" | "title">;
 };
 
@@ -89,6 +90,7 @@ function App() {
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
+  const [selectedTaskRecurrence, setSelectedTaskRecurrence] = useState<RecurrenceRule | null>(null);
   const [pendingTaskDeletion, setPendingTaskDeletion] = useState<TaskRecord | null>(null);
   const [subtasks, setSubtasks] = useState<TaskRecord[]>([]);
   const [taskTags, setTaskTags] = useState<TagRecord[]>([]);
@@ -254,9 +256,13 @@ function App() {
         return;
       }
 
-      await taskService.completeTask(task.id);
-      setTasks((currentTasks) => currentTasks.filter((currentTask) => currentTask.id !== task.id));
-      setLastTaskAction({ kind: "completed", task: { id: task.id, title: task.title } });
+      const completion = await taskService.completeTask(task.id);
+      await loadInboxTasks();
+      setLastTaskAction({
+        kind: "completed",
+        nextRecurringTaskId: completion.nextTaskId,
+        task: { id: task.id, title: task.title },
+      });
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
     } catch (error) {
@@ -337,14 +343,19 @@ function App() {
     }
   }
 
-  async function handleSaveTaskDetails(input: UpdateTaskInput) {
+  async function handleSaveTaskDetails(input: TaskDetailSaveInput) {
     if (!selectedTask) return;
 
     setTaskError(null);
     setIsSavingTaskDetails(true);
 
     try {
-      const updatedTask = await taskService.updateTask(selectedTask.id, input);
+      const { recurrenceFrequency, ...taskInput } = input;
+      const updatedTask = await taskService.updateTask(selectedTask.id, taskInput);
+      await taskService.updateRecurrenceRule(
+        updatedTask.id,
+        recurrenceFrequency ? { frequency: recurrenceFrequency } : null,
+      );
       setTasks((currentTasks) =>
         currentTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
       );
@@ -361,16 +372,19 @@ function App() {
   async function openTaskDetails(task: TaskRecord) {
     setTaskError(null);
     setSelectedTask(task);
+    setSelectedTaskRecurrence(null);
     setSubtasks([]);
     setTaskTags([]);
 
     try {
-      const [activeSubtasks, appliedTags] = await Promise.all([
+      const [activeSubtasks, appliedTags, recurrenceRule] = await Promise.all([
         taskService.listActiveSubtasks(task.id),
         tagService.listTaskTags(task.id),
+        taskService.getRecurrenceRule(task.id),
       ]);
       setSubtasks(activeSubtasks);
       setTaskTags(appliedTags);
+      setSelectedTaskRecurrence(recurrenceRule);
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取子任务，请重试。");
     }
@@ -503,7 +517,14 @@ function App() {
         );
         setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
       } else {
-        await taskService.restoreTask(lastTaskAction.task.id);
+        if (lastTaskAction.kind === "completed" && lastTaskAction.nextRecurringTaskId) {
+          await taskService.undoRecurringCompletion(
+            lastTaskAction.task.id,
+            lastTaskAction.nextRecurringTaskId,
+          );
+        } else {
+          await taskService.restoreTask(lastTaskAction.task.id);
+        }
         setTrashedTasks((currentTasks) =>
           currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
         );
@@ -1583,9 +1604,11 @@ function App() {
           isSaving={isSavingTaskDetails}
           isSavingSubtask={isSavingSubtask}
           isSavingTag={isSavingTag}
+          key={`${selectedTask.id}-${selectedTaskRecurrence?.id ?? "new"}`}
           onClose={() => {
             if (!isSavingTaskDetails) {
               setSelectedTask(null);
+              setSelectedTaskRecurrence(null);
               setTaskError(null);
             }
           }}
@@ -1595,6 +1618,7 @@ function App() {
           onSave={(input) => void handleSaveTaskDetails(input)}
           onToggleTag={(tagId) => void handleToggleTag(tagId)}
           projects={projects}
+          recurrenceRule={selectedTaskRecurrence}
           subtasks={subtasks}
           tags={tags}
           task={selectedTask}

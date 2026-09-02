@@ -2,8 +2,17 @@ import { FormEvent, useState } from "react";
 
 import type { ProjectRecord } from "../projects/project-types";
 import type { TagRecord } from "../tags/tag-types";
-import { type TaskPriority, type TaskRecord } from "./task-types";
+import {
+  type RecurrenceFrequency,
+  type RecurrenceRule,
+  type TaskPriority,
+  type TaskRecord,
+} from "./task-types";
 import type { UpdateTaskInput } from "./task-service";
+
+export type TaskDetailSaveInput = UpdateTaskInput & {
+  recurrenceFrequency: RecurrenceFrequency | null;
+};
 
 type TaskDetailDialogProps = {
   error: string | null;
@@ -14,9 +23,10 @@ type TaskDetailDialogProps = {
   onCompleteSubtask: (subtaskId: string) => void;
   onCreateSubtask: (title: string) => void;
   onCreateTag: (name: string) => void;
-  onSave: (input: UpdateTaskInput) => void;
+  onSave: (input: TaskDetailSaveInput) => void;
   onToggleTag: (tagId: string) => void;
   projects: ProjectRecord[];
+  recurrenceRule: RecurrenceRule | null;
   subtasks: TaskRecord[];
   tags: TagRecord[];
   taskTags: TagRecord[];
@@ -39,6 +49,14 @@ const priorityOptions: Array<{ label: string; value: TaskPriority }> = [
   { label: "低", value: 1 },
   { label: "中", value: 2 },
   { label: "高", value: 3 },
+];
+
+const recurrenceOptions: Array<{ label: string; value: "" | RecurrenceFrequency }> = [
+  { label: "不重复", value: "" },
+  { label: "每天", value: "daily" },
+  { label: "工作日（周一至周五）", value: "weekdays" },
+  { label: "每周（当前计划日）", value: "weekly" },
+  { label: "每月（当前日期）", value: "monthly" },
 ];
 
 const weekdayLabels = ["一", "二", "三", "四", "五", "六", "日"];
@@ -383,6 +401,7 @@ export function TaskDetailDialog({
   onSave,
   onToggleTag,
   projects,
+  recurrenceRule,
   subtasks,
   tags,
   task,
@@ -392,6 +411,9 @@ export function TaskDetailDialog({
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [tagName, setTagName] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<"" | RecurrenceFrequency>(
+    recurrenceRule?.frequency ?? "",
+  );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -410,6 +432,10 @@ export function TaskDetailDialog({
       (!Number.isInteger(estimatedMinutes) || estimatedMinutes <= 0)
     ) {
       setValidationError("预计时长必须是大于 0 的整数分钟。");
+      return;
+    }
+    if (recurrenceFrequency && !scheduledDate) {
+      setValidationError("设置重复前，请先选择计划日期。");
       return;
     }
     if (
@@ -434,6 +460,7 @@ export function TaskDetailDialog({
           ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
           : null,
       title: draft.title,
+      recurrenceFrequency: recurrenceFrequency || null,
     });
   }
 
@@ -601,6 +628,33 @@ export function TaskDetailDialog({
             {scheduleAfterDue ? (
               <p className="schedule-warning">
                 计划日期晚于截止日期；会保留此安排并在后续视图中提示。
+              </p>
+            ) : null}
+          </section>
+          <section aria-labelledby="task-recurrence-title" className="task-recurrence-section">
+            <div className="task-recurrence-heading">
+              <div>
+                <p className="eyebrow">重复</p>
+                <h3 id="task-recurrence-title">完成后再创建下一次</h3>
+              </div>
+              <span>不会预先生成未来任务</span>
+            </div>
+            <SelectField
+              disabled={isSaving}
+              id="task-detail-recurrence"
+              label="重复规则"
+              onChange={(frequency) =>
+                setRecurrenceFrequency(String(frequency) as "" | RecurrenceFrequency)
+              }
+              options={recurrenceOptions.map((option) => ({
+                ...option,
+                disabled: Boolean(option.value && !draft.scheduledDate),
+              }))}
+              value={recurrenceFrequency}
+            />
+            {recurrenceFrequency ? (
+              <p className="recurrence-note">
+                将沿用项目、标签、优先级和时间安排；修改只影响本次任务。
               </p>
             ) : null}
           </section>

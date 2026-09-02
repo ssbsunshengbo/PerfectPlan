@@ -1424,6 +1424,48 @@ h1 {
   background: linear-gradient(135deg, #f3faf5, #fffefa);
   padding: 18px;
 }
+.task-recurrence-section {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d8d5eb;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f7f6ff, #fffefa);
+  padding: 18px;
+}
+.task-recurrence-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.task-recurrence-heading .eyebrow {
+  margin-bottom: 4px;
+  color: #6f6494;
+  font-size: 10px;
+}
+.task-recurrence-heading h3 {
+  margin: 0;
+  font-family: Georgia, "Songti SC", serif;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.task-recurrence-heading > span {
+  border-radius: 999px;
+  background: #ebe8f8;
+  padding: 4px 8px;
+  color: #5f5682;
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1.4;
+  text-align: right;
+}
+.recurrence-note {
+  margin: 0;
+  color: #6d6783;
+  font-size: 12px;
+  line-height: 1.55;
+}
 .task-schedule-heading {
   display: flex;
   align-items: flex-start;

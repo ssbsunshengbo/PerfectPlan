@@ -1,6 +1,9 @@
 import { getDatabase } from "../database/database";
 import {
   taskPriorities,
+  recurrenceFrequencies,
+  type RecurrenceFrequency,
+  type RecurrenceRule,
   taskStatuses,
   type TaskPriority,
   type TaskRecord,
@@ -26,6 +29,18 @@ type TaskRow = {
   updated_at: string;
 };
 
+type RecurrenceRuleRow = {
+  id: string;
+  task_id: string;
+  frequency: string;
+  interval_count: number;
+  weekdays: string | null;
+  day_of_month: number | null;
+  until_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type CreateTaskInput = {
   title: string;
   notes?: string;
@@ -43,6 +58,15 @@ export type UpdateTaskInput = {
   scheduledStartAt?: string | null;
   estimatedMinutes?: number | null;
   dueDate?: string | null;
+};
+
+export type UpdateTaskRecurrenceInput = {
+  frequency: RecurrenceFrequency;
+};
+
+export type CompleteTaskResult = {
+  nextTaskId: string | null;
+  task: TaskRecord;
 };
 
 export type TaskSearchFilters = {
@@ -142,6 +166,86 @@ function toLocalDateValue(date: Date): string {
   ).padStart(2, "0")}`;
 }
 
+function toLocalDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+}
+
+function addDays(value: string, amount: number): string {
+  const date = toLocalDate(value);
+  date.setDate(date.getDate() + amount);
+  return toLocalDateValue(date);
+}
+
+function daysBetween(startDate: string, endDate: string): number {
+  return Math.round(
+    (toLocalDate(endDate).getTime() - toLocalDate(startDate).getTime()) / 86_400_000,
+  );
+}
+
+function weekdayForDate(value: string): number {
+  const day = toLocalDate(value).getDay();
+  return day === 0 ? 7 : day;
+}
+
+function daysInMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function nextOccurrenceDate(task: TaskRecord, rule: RecurrenceRule): string {
+  if (!task.scheduledDate) {
+    throw new Error("重复任务需要先设置计划日期");
+  }
+
+  switch (rule.frequency) {
+    case "daily":
+      return addDays(task.scheduledDate, rule.intervalCount);
+    case "weekdays": {
+      let candidate = task.scheduledDate;
+      do {
+        candidate = addDays(candidate, 1);
+      } while (weekdayForDate(candidate) > 5);
+      return candidate;
+    }
+    case "weekly": {
+      const weekdays =
+        rule.weekdays.length > 0 ? rule.weekdays : [weekdayForDate(task.scheduledDate)];
+      let candidate = task.scheduledDate;
+      do {
+        candidate = addDays(candidate, 1);
+      } while (!weekdays.includes(weekdayForDate(candidate)));
+      return candidate;
+    }
+    case "monthly": {
+      const current = toLocalDate(task.scheduledDate);
+      const nextMonth = current.getMonth() + rule.intervalCount;
+      const dayOfMonth = rule.dayOfMonth ?? current.getDate();
+      return toLocalDateValue(
+        new Date(
+          current.getFullYear(),
+          nextMonth,
+          Math.min(dayOfMonth, daysInMonth(current.getFullYear(), nextMonth)),
+        ),
+      );
+    }
+  }
+}
+
+function nextScheduledStartAt(currentStartAt: string | null, nextDate: string): string | null {
+  if (!currentStartAt) return null;
+
+  const current = new Date(currentStartAt);
+  if (Number.isNaN(current.getTime())) return null;
+  const next = toLocalDate(nextDate);
+  next.setHours(
+    current.getHours(),
+    current.getMinutes(),
+    current.getSeconds(),
+    current.getMilliseconds(),
+  );
+  return next.toISOString();
+}
+
 function validateTaskSchedule(
   scheduledDate: string | null,
   scheduledStartAt: string | null,
@@ -197,6 +301,39 @@ function toTaskRecord(row: TaskRow): TaskRecord {
     completedAt: row.completed_at,
     deletedAt: row.deleted_at,
     sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toRecurrenceRule(row: RecurrenceRuleRow): RecurrenceRule {
+  if (!recurrenceFrequencies.includes(row.frequency as RecurrenceFrequency)) {
+    throw new Error(`数据库中存在未知重复规则：${row.frequency}`);
+  }
+
+  let weekdays: number[] = [];
+  if (row.weekdays) {
+    try {
+      const parsed = JSON.parse(row.weekdays);
+      if (
+        Array.isArray(parsed) &&
+        parsed.every((day) => Number.isInteger(day) && day >= 1 && day <= 7)
+      ) {
+        weekdays = parsed;
+      }
+    } catch {
+      throw new Error("数据库中存在无效重复星期设置");
+    }
+  }
+
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    frequency: row.frequency as RecurrenceFrequency,
+    intervalCount: row.interval_count,
+    weekdays,
+    dayOfMonth: row.day_of_month,
+    untilDate: row.until_date,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -511,18 +648,221 @@ export const taskService = {
     return requireTask(taskId);
   },
 
-  async completeTask(taskId: string): Promise<TaskRecord> {
+  async getRecurrenceRule(taskId: string): Promise<RecurrenceRule | null> {
     const database = await getDatabase();
-    const completedAt = now();
-    const result = await database.execute(
-      `UPDATE tasks
-       SET status = $1, completed_at = $2, deleted_at = NULL, updated_at = $3
-       WHERE id = $4`,
-      ["completed", completedAt, completedAt, taskId],
+    const rows = await database.select<RecurrenceRuleRow[]>(
+      `SELECT id, task_id, frequency, interval_count, weekdays, day_of_month, until_date,
+              created_at, updated_at
+       FROM recurrence_rules
+       WHERE task_id = $1
+       LIMIT 1`,
+      [taskId],
     );
 
-    if (result.rowsAffected === 0) {
-      throw new TaskNotFoundError(taskId);
+    return rows[0] ? toRecurrenceRule(rows[0]) : null;
+  },
+
+  async updateRecurrenceRule(
+    taskId: string,
+    input: UpdateTaskRecurrenceInput | null,
+  ): Promise<RecurrenceRule | null> {
+    const task = await requireTask(taskId);
+    const database = await getDatabase();
+
+    if (!input) {
+      await database.execute("DELETE FROM recurrence_rules WHERE task_id = $1", [taskId]);
+      return null;
+    }
+
+    if (!recurrenceFrequencies.includes(input.frequency)) {
+      throw new Error("不支持的重复规则");
+    }
+    if (!task.scheduledDate) {
+      throw new Error("设置重复前，请先选择计划日期");
+    }
+
+    const createdAt = now();
+    const weekdays =
+      input.frequency === "weekly" ? JSON.stringify([weekdayForDate(task.scheduledDate)]) : null;
+    const dayOfMonth =
+      input.frequency === "monthly" ? toLocalDate(task.scheduledDate).getDate() : null;
+    const existingRule = await taskService.getRecurrenceRule(taskId);
+    const ruleId = existingRule?.id ?? crypto.randomUUID();
+
+    await database.execute(
+      `INSERT INTO recurrence_rules (
+        id, task_id, frequency, interval_count, weekdays, day_of_month, until_date, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8)
+      ON CONFLICT(task_id) DO UPDATE SET
+        frequency = excluded.frequency,
+        interval_count = excluded.interval_count,
+        weekdays = excluded.weekdays,
+        day_of_month = excluded.day_of_month,
+        updated_at = excluded.updated_at`,
+      [
+        ruleId,
+        taskId,
+        input.frequency,
+        1,
+        weekdays,
+        dayOfMonth,
+        existingRule?.createdAt ?? createdAt,
+        createdAt,
+      ],
+    );
+
+    return taskService.getRecurrenceRule(taskId);
+  },
+
+  async completeTask(taskId: string): Promise<CompleteTaskResult> {
+    const task = await requireTask(taskId);
+    const recurrenceRule = await taskService.getRecurrenceRule(taskId);
+    const database = await getDatabase();
+    const completedAt = now();
+
+    if (!recurrenceRule) {
+      const result = await database.execute(
+        `UPDATE tasks
+         SET status = $1, completed_at = $2, deleted_at = NULL, updated_at = $3
+         WHERE id = $4`,
+        ["completed", completedAt, completedAt, taskId],
+      );
+
+      if (result.rowsAffected === 0) {
+        throw new TaskNotFoundError(taskId);
+      }
+
+      return { nextTaskId: null, task: await requireTask(taskId) };
+    }
+
+    const nextDate = nextOccurrenceDate(task, recurrenceRule);
+    const shouldCreateNext = !recurrenceRule.untilDate || nextDate <= recurrenceRule.untilDate;
+    const nextTaskId = shouldCreateNext ? crypto.randomUUID() : null;
+
+    await database.execute("BEGIN IMMEDIATE");
+    try {
+      const result = await database.execute(
+        `UPDATE tasks
+         SET status = $1, completed_at = $2, deleted_at = NULL, updated_at = $3
+         WHERE id = $4 AND status = 'active'`,
+        ["completed", completedAt, completedAt, taskId],
+      );
+
+      if (result.rowsAffected === 0) {
+        throw new TaskNotFoundError(taskId);
+      }
+
+      await database.execute("DELETE FROM recurrence_rules WHERE task_id = $1", [taskId]);
+
+      if (nextTaskId) {
+        const nextDueDate =
+          task.dueDate && task.scheduledDate
+            ? addDays(nextDate, daysBetween(task.scheduledDate, task.dueDate))
+            : task.dueDate;
+        const nextCreatedAt = now();
+        await database.execute(
+          `INSERT INTO tasks (
+            id, title, notes, status, priority, project_id, parent_task_id,
+            scheduled_date, scheduled_start_at, estimated_minutes, due_date,
+            sort_order, created_at, updated_at
+          ) VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            nextTaskId,
+            task.title,
+            task.notes,
+            task.priority,
+            task.projectId,
+            task.parentTaskId,
+            nextDate,
+            nextScheduledStartAt(task.scheduledStartAt, nextDate),
+            task.estimatedMinutes,
+            nextDueDate,
+            task.sortOrder,
+            nextCreatedAt,
+            nextCreatedAt,
+          ],
+        );
+        await database.execute(
+          `INSERT INTO task_tags (task_id, tag_id, created_at)
+           SELECT $1, tag_id, $2 FROM task_tags WHERE task_id = $3`,
+          [nextTaskId, nextCreatedAt, taskId],
+        );
+        await database.execute(
+          `INSERT INTO recurrence_rules (
+            id, task_id, frequency, interval_count, weekdays, day_of_month, until_date,
+            created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            recurrenceRule.id,
+            nextTaskId,
+            recurrenceRule.frequency,
+            recurrenceRule.intervalCount,
+            recurrenceRule.weekdays.length ? JSON.stringify(recurrenceRule.weekdays) : null,
+            recurrenceRule.dayOfMonth,
+            recurrenceRule.untilDate,
+            recurrenceRule.createdAt,
+            nextCreatedAt,
+          ],
+        );
+      }
+
+      await database.execute("COMMIT");
+    } catch (error) {
+      await database.execute("ROLLBACK");
+      throw error;
+    }
+
+    return { nextTaskId, task: await requireTask(taskId) };
+  },
+
+  async undoRecurringCompletion(taskId: string, nextTaskId: string): Promise<TaskRecord> {
+    const recurrenceRule = await taskService.getRecurrenceRule(nextTaskId);
+    if (!recurrenceRule) {
+      throw new Error("找不到可撤销的重复规则");
+    }
+
+    const database = await getDatabase();
+    const restoredAt = now();
+    await database.execute("BEGIN IMMEDIATE");
+    try {
+      const restoredTask = await database.execute(
+        `UPDATE tasks
+         SET status = 'active', completed_at = NULL, deleted_at = NULL, updated_at = $1
+         WHERE id = $2 AND status = 'completed'`,
+        [restoredAt, taskId],
+      );
+      if (restoredTask.rowsAffected === 0) throw new TaskNotFoundError(taskId);
+
+      const trashedNextTask = await database.execute(
+        `UPDATE tasks
+         SET status = 'trashed', deleted_at = $1, updated_at = $1
+         WHERE id = $2 AND status = 'active'`,
+        [restoredAt, nextTaskId],
+      );
+      if (trashedNextTask.rowsAffected === 0) throw new TaskNotFoundError(nextTaskId);
+
+      await database.execute("DELETE FROM recurrence_rules WHERE task_id = $1", [nextTaskId]);
+      await database.execute(
+        `INSERT INTO recurrence_rules (
+          id, task_id, frequency, interval_count, weekdays, day_of_month, until_date,
+          created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          recurrenceRule.id,
+          taskId,
+          recurrenceRule.frequency,
+          recurrenceRule.intervalCount,
+          recurrenceRule.weekdays.length ? JSON.stringify(recurrenceRule.weekdays) : null,
+          recurrenceRule.dayOfMonth,
+          recurrenceRule.untilDate,
+          recurrenceRule.createdAt,
+          restoredAt,
+        ],
+      );
+      await database.execute("COMMIT");
+    } catch (error) {
+      await database.execute("ROLLBACK");
+      throw error;
     }
 
     return requireTask(taskId);

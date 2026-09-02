@@ -22,3 +22,18 @@ export type TaskRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+export const recurrenceFrequencies = ["daily", "weekdays", "weekly", "monthly"] as const;
+export type RecurrenceFrequency = (typeof recurrenceFrequencies)[number];
+
+export type RecurrenceRule = {
+  id: string;
+  taskId: string;
+  frequency: RecurrenceFrequency;
+  intervalCount: number;
+  weekdays: number[];
+  dayOfMonth: number | null;
+  untilDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

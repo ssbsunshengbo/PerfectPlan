@@ -54,15 +54,128 @@ describe("taskService", () => {
     expect(getDatabase).not.toHaveBeenCalled();
   });
 
-  it("marks a task complete and returns the persisted task", async () => {
-    select.mockResolvedValueOnce([{ ...taskRow, status: "completed" }]);
+  it("marks a one-off task complete and returns the persisted task", async () => {
+    select
+      .mockResolvedValueOnce([taskRow])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ ...taskRow, status: "completed" }]);
     execute.mockResolvedValueOnce({ rowsAffected: 1 });
 
-    const task = await taskService.completeTask("task-1");
+    const result = await taskService.completeTask("task-1");
 
-    expect(task.status).toBe("completed");
+    expect(result.task.status).toBe("completed");
+    expect(result.nextTaskId).toBeNull();
     expect(execute.mock.calls[0]?.[0]).toContain("SET status = $1");
     expect(execute.mock.calls[0]?.[1]?.[0]).toBe("completed");
+  });
+
+  it("moves a repeat rule to the next instance only when the current task is completed", async () => {
+    const recurringTask = {
+      ...taskRow,
+      due_date: "2026-09-05",
+      estimated_minutes: 30,
+      scheduled_date: "2026-09-04",
+      scheduled_start_at: "2026-09-04T01:30:00.000Z",
+    };
+    const recurrenceRule = {
+      id: "rule-1",
+      task_id: "task-1",
+      frequency: "weekly",
+      interval_count: 1,
+      weekdays: "[5]",
+      day_of_month: null,
+      until_date: null,
+      created_at: "2026-09-01T00:00:00.000Z",
+      updated_at: "2026-09-01T00:00:00.000Z",
+    };
+    select
+      .mockResolvedValueOnce([recurringTask])
+      .mockResolvedValueOnce([recurrenceRule])
+      .mockResolvedValueOnce([{ ...recurringTask, status: "completed" }]);
+    execute.mockResolvedValue({ rowsAffected: 1 });
+
+    const result = await taskService.completeTask("task-1");
+
+    expect(result.task.status).toBe("completed");
+    expect(result.nextTaskId).toBeTruthy();
+    expect(execute.mock.calls[0]?.[0]).toBe("BEGIN IMMEDIATE");
+    expect(execute.mock.calls[1]?.[0]).toContain("WHERE id = $4 AND status = 'active'");
+    expect(execute.mock.calls[3]?.[0]).toContain("INSERT INTO tasks");
+    expect(execute.mock.calls[3]?.[1]?.[6]).toBe("2026-09-11");
+    expect(execute.mock.calls[4]?.[0]).toContain("INSERT INTO task_tags");
+    expect(execute.mock.calls[5]?.[0]).toContain("INSERT INTO recurrence_rules");
+    expect(execute.mock.calls[6]?.[0]).toBe("COMMIT");
+  });
+
+  it.each([
+    ["daily", null, null, "2026-09-05"],
+    ["weekdays", null, null, "2026-09-07"],
+    ["weekly", "[5]", null, "2026-09-11"],
+    ["monthly", null, 4, "2026-10-04"],
+  ] as const)(
+    "calculates the next %s occurrence",
+    async (frequency, weekdays, dayOfMonth, expectedDate) => {
+      const recurringTask = { ...taskRow, scheduled_date: "2026-09-04" };
+      const recurrenceRule = {
+        id: "rule-1",
+        task_id: "task-1",
+        frequency,
+        interval_count: 1,
+        weekdays,
+        day_of_month: dayOfMonth,
+        until_date: null,
+        created_at: "2026-09-01T00:00:00.000Z",
+        updated_at: "2026-09-01T00:00:00.000Z",
+      };
+      select.mockReset();
+      execute.mockReset();
+      select
+        .mockResolvedValueOnce([recurringTask])
+        .mockResolvedValueOnce([recurrenceRule])
+        .mockResolvedValueOnce([{ ...recurringTask, status: "completed" }]);
+      execute.mockResolvedValue({ rowsAffected: 1 });
+
+      await taskService.completeTask("task-1");
+
+      expect(execute.mock.calls[3]?.[1]?.[6]).toBe(expectedDate);
+    },
+  );
+
+  it("requires a plan date before enabling a repeat rule", async () => {
+    select.mockResolvedValueOnce([taskRow]);
+
+    await expect(
+      taskService.updateRecurrenceRule("task-1", { frequency: "daily" }),
+    ).rejects.toThrow("设置重复前，请先选择计划日期");
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("undoes a recurring completion by moving the rule back to the restored task", async () => {
+    const recurrenceRule = {
+      id: "rule-1",
+      task_id: "next-task-1",
+      frequency: "daily",
+      interval_count: 1,
+      weekdays: null,
+      day_of_month: null,
+      until_date: null,
+      created_at: "2026-09-01T00:00:00.000Z",
+      updated_at: "2026-09-01T00:00:00.000Z",
+    };
+    select
+      .mockResolvedValueOnce([recurrenceRule])
+      .mockResolvedValueOnce([{ ...taskRow, status: "active", completed_at: null }]);
+    execute.mockResolvedValue({ rowsAffected: 1 });
+
+    const task = await taskService.undoRecurringCompletion("task-1", "next-task-1");
+
+    expect(task.status).toBe("active");
+    expect(execute.mock.calls[0]?.[0]).toBe("BEGIN IMMEDIATE");
+    expect(execute.mock.calls[1]?.[0]).toContain("status = 'completed'");
+    expect(execute.mock.calls[2]?.[0]).toContain("status = 'active'");
+    expect(execute.mock.calls[3]?.[0]).toContain("DELETE FROM recurrence_rules");
+    expect(execute.mock.calls[4]?.[0]).toContain("INSERT INTO recurrence_rules");
+    expect(execute.mock.calls[5]?.[0]).toBe("COMMIT");
   });
 
   it("moves an accidentally created task to the trash for undo", async () => {
