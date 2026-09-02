@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 
 import type { ProjectRecord } from "../projects/project-types";
+import type { NotificationPermissionState } from "../reminders/notification-service";
+import type { ReminderRecord } from "../reminders/reminder-types";
 import type { TagRecord } from "../tags/tag-types";
 import {
   type RecurrenceFrequency,
@@ -11,6 +13,7 @@ import {
 import type { UpdateTaskInput } from "./task-service";
 
 export type TaskDetailSaveInput = UpdateTaskInput & {
+  remindAt: string | null;
   recurrenceFrequency: RecurrenceFrequency | null;
 };
 
@@ -23,10 +26,13 @@ type TaskDetailDialogProps = {
   onCompleteSubtask: (subtaskId: string) => void;
   onCreateSubtask: (title: string) => void;
   onCreateTag: (name: string) => void;
+  onRequestNotificationPermission: () => void;
   onSave: (input: TaskDetailSaveInput) => void;
   onToggleTag: (tagId: string) => void;
+  notificationPermission: NotificationPermissionState;
   projects: ProjectRecord[];
   recurrenceRule: RecurrenceRule | null;
+  reminder: ReminderRecord | null;
   subtasks: TaskRecord[];
   tags: TagRecord[];
   taskTags: TagRecord[];
@@ -39,6 +45,8 @@ type TaskDetailDraft = {
   notes: string;
   projectId: string;
   priority: TaskPriority;
+  reminderDate: string;
+  reminderTime: string;
   scheduledDate: string;
   scheduledTime: string;
   title: string;
@@ -251,12 +259,16 @@ function DatePickerField({
 
 function TimePickerField({
   disabled,
+  emptyLabel = "全天，不设具体时间",
   id,
+  label = "具体时间（可选）",
   onChange,
   value,
 }: {
   disabled: boolean;
+  emptyLabel?: string;
   id: string;
+  label?: string;
   onChange: (value: string) => void;
   value: string;
 }) {
@@ -264,7 +276,7 @@ function TimePickerField({
 
   return (
     <div className="time-picker-field">
-      <span id={`${id}-label`}>具体时间（可选）</span>
+      <span id={`${id}-label`}>{label}</span>
       <button
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -274,11 +286,11 @@ function TimePickerField({
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
-        <span>{value || "全天，不设具体时间"}</span>
+        <span>{value || emptyLabel}</span>
         <span aria-hidden="true">⌄</span>
       </button>
       {isOpen ? (
-        <div aria-label="选择具体时间" className="time-picker-popover" role="listbox">
+        <div aria-label={`选择${label}`} className="time-picker-popover" role="listbox">
           <button
             aria-selected={!value}
             className={!value ? "is-selected time-clear-option" : "time-clear-option"}
@@ -289,7 +301,7 @@ function TimePickerField({
             role="option"
             type="button"
           >
-            全天，不设具体时间
+            {emptyLabel}
           </button>
           <div className="time-option-grid">
             {timeOptions.map((time) => (
@@ -376,13 +388,15 @@ function exceedsLocalDay(scheduledDate: string, scheduledTime: string, minutes: 
   return start.getTime() + minutes * 60_000 > nextDay.getTime();
 }
 
-function toDraft(task: TaskRecord): TaskDetailDraft {
+function toDraft(task: TaskRecord, reminder: ReminderRecord | null): TaskDetailDraft {
   return {
     dueDate: task.dueDate ?? "",
     estimatedMinutes: task.estimatedMinutes?.toString() ?? "",
     notes: task.notes,
     projectId: task.projectId ?? "",
     priority: task.priority,
+    reminderDate: reminder ? toDateValue(new Date(reminder.remindAt)) : "",
+    reminderTime: reminder ? toLocalTime(reminder.remindAt) : "",
     scheduledDate: task.scheduledDate ?? "",
     scheduledTime: toLocalTime(task.scheduledStartAt),
     title: task.title,
@@ -398,16 +412,19 @@ export function TaskDetailDialog({
   onCompleteSubtask,
   onCreateSubtask,
   onCreateTag,
+  onRequestNotificationPermission,
   onSave,
   onToggleTag,
+  notificationPermission,
   projects,
   recurrenceRule,
+  reminder,
   subtasks,
   tags,
   task,
   taskTags,
 }: TaskDetailDialogProps) {
-  const [draft, setDraft] = useState(() => toDraft(task));
+  const [draft, setDraft] = useState(() => toDraft(task, reminder));
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [tagName, setTagName] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -422,6 +439,8 @@ export function TaskDetailDialog({
     const scheduledDate = draft.scheduledDate || null;
     const scheduledTime = draft.scheduledTime || null;
     const estimatedMinutes = draft.estimatedMinutes ? Number(draft.estimatedMinutes) : null;
+    const reminderDate = draft.reminderDate || null;
+    const reminderTime = draft.reminderTime || null;
 
     if (scheduledTime && !scheduledDate) {
       setValidationError("设置具体时间前，请先选择计划日期。");
@@ -436,6 +455,18 @@ export function TaskDetailDialog({
     }
     if (recurrenceFrequency && !scheduledDate) {
       setValidationError("设置重复前，请先选择计划日期。");
+      return;
+    }
+    if ((reminderDate && !reminderTime) || (!reminderDate && reminderTime)) {
+      setValidationError("提醒需要同时设置日期和时间。");
+      return;
+    }
+    const remindAt =
+      reminderDate && reminderTime
+        ? new Date(`${reminderDate}T${reminderTime}`).toISOString()
+        : null;
+    if (remindAt && Date.parse(remindAt) <= Date.now()) {
+      setValidationError("提醒时间需要晚于现在。");
       return;
     }
     if (
@@ -454,6 +485,7 @@ export function TaskDetailDialog({
       notes: draft.notes,
       priority: draft.priority,
       projectId: draft.projectId || null,
+      remindAt,
       scheduledDate,
       scheduledStartAt:
         scheduledDate && scheduledTime
@@ -630,6 +662,54 @@ export function TaskDetailDialog({
                 计划日期晚于截止日期；会保留此安排并在后续视图中提示。
               </p>
             ) : null}
+          </section>
+          <section aria-labelledby="task-reminder-title" className="task-reminder-section">
+            <div className="task-recurrence-heading">
+              <div>
+                <p className="eyebrow">本地提醒</p>
+                <h3 id="task-reminder-title">在需要时提醒自己</h3>
+              </div>
+              <span>{draft.reminderDate ? "已设置" : "未设置"}</span>
+            </div>
+            <div className="detail-field-grid">
+              <DatePickerField
+                disabled={isSaving}
+                id="task-detail-reminder-date"
+                label="提醒日期"
+                onChange={(reminderDate) => setDraft((current) => ({ ...current, reminderDate }))}
+                value={draft.reminderDate}
+              />
+              <TimePickerField
+                disabled={isSaving || !draft.reminderDate}
+                emptyLabel="选择提醒时间"
+                id="task-detail-reminder-time"
+                label="提醒时间"
+                onChange={(reminderTime) => setDraft((current) => ({ ...current, reminderTime }))}
+                value={draft.reminderTime}
+              />
+            </div>
+            {notificationPermission === "granted" ? (
+              <p className="reminder-note">系统通知已开启。应用运行期间，到点会显示提醒。</p>
+            ) : (
+              <div className="reminder-permission-note">
+                <p>
+                  {notificationPermission === "denied"
+                    ? "系统通知被拒绝。请前往系统设置 → 通知 → PerfectPlan 开启后再试。"
+                    : "系统通知尚未开启。保存提醒后可授权，以便到点收到系统通知。"}
+                </p>
+                <button
+                  className="secondary-button"
+                  disabled={isSaving}
+                  onClick={onRequestNotificationPermission}
+                  type="button"
+                >
+                  开启系统通知
+                </button>
+              </div>
+            )}
+            <p className="reminder-note">
+              应用完全退出时不会触发提醒；后台运行能力将在后续版本验证。
+            </p>
           </section>
           <section aria-labelledby="task-recurrence-title" className="task-recurrence-section">
             <div className="task-recurrence-heading">

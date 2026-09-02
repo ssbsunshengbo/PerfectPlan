@@ -1633,6 +1633,35 @@ h1 {
 .undo-toast button:hover {
   background: #d7ecdf;
 }
+.reminder-toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(460px, calc(100vw - 40px));
+  border: 1px solid #d9d5b9;
+  border-radius: 14px;
+  background: #fffdf6;
+  box-shadow: 0 16px 40px rgba(63, 57, 35, 0.16);
+  padding: 13px 14px 13px 16px;
+  color: #5f583e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.reminder-toast button {
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  background: #f4ecd2;
+  padding: 7px 9px;
+  color: #725d1f;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 .database-status {
   display: flex;
   align-items: center;
@@ -2158,6 +2187,47 @@ h1 {
   border-radius: 15px;
   background: linear-gradient(135deg, #f7f6ff, #fffefa);
   padding: 18px;
+}
+.task-reminder-section {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d9d5b9;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #fffbed, #fffefa);
+  padding: 18px;
+}
+.task-reminder-section .task-recurrence-heading .eyebrow {
+  color: #89773c;
+}
+.task-reminder-section .task-recurrence-heading > span {
+  background: #f8efcf;
+  color: #81691f;
+}
+.task-reminder-section .calendar-popover,
+.task-reminder-section .time-picker-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.reminder-note,
+.reminder-permission-note p {
+  margin: 0;
+  color: #766b4a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.reminder-permission-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-left: 3px solid #d3ad42;
+  padding-left: 9px;
+}
+.reminder-permission-note .secondary-button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 11px;
 }
 .task-recurrence-heading {
   display: flex;

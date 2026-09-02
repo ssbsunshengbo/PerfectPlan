@@ -26,6 +26,14 @@ import {
   toTimeValue,
 } from "./features/calendar/calendar-scheduling";
 import { dailyPlanService } from "./features/daily-plan/daily-plan-service";
+import {
+  getNotificationPermissionState,
+  requestNotificationPermission,
+  sendTaskReminderNotification,
+  type NotificationPermissionState,
+} from "./features/reminders/notification-service";
+import { reminderService } from "./features/reminders/reminder-service";
+import type { ReminderRecord } from "./features/reminders/reminder-types";
 import { projectService, type UpdateProjectInput } from "./features/projects/project-service";
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
@@ -233,6 +241,7 @@ function App() {
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
+  const [selectedTaskReminder, setSelectedTaskReminder] = useState<ReminderRecord | null>(null);
   const [selectedTaskRecurrence, setSelectedTaskRecurrence] = useState<RecurrenceRule | null>(null);
   const [pendingTaskDeletion, setPendingTaskDeletion] = useState<TaskRecord | null>(null);
   const [subtasks, setSubtasks] = useState<TaskRecord[]>([]);
@@ -254,6 +263,9 @@ function App() {
   const [lastTaskAction, setLastTaskAction] = useState<ReversibleTaskAction | null>(null);
   const [isUndoingTaskAction, setIsUndoingTaskAction] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] =
+    useState<NotificationPermissionState>("unknown");
+  const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isSearchComposingRef = useRef(false);
 
@@ -320,6 +332,41 @@ function App() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [databaseState]);
+
+  useEffect(() => {
+    if (databaseState !== "ready") return;
+    let isMounted = true;
+
+    void getNotificationPermissionState().then((permission) => {
+      if (isMounted) setNotificationPermission(permission);
+    });
+
+    async function deliverDueReminders() {
+      try {
+        const reminders = await reminderService.claimDueReminders();
+        if (reminders.length === 0) return;
+
+        if ((await getNotificationPermissionState()) === "granted") {
+          reminders.forEach((reminder) => sendTaskReminderNotification(reminder.taskTitle));
+        } else if (isMounted) {
+          setReminderNotice(
+            `有 ${reminders.length} 个提醒到期，但系统通知未开启。可在任务详情中开启通知。`,
+          );
+        }
+      } catch (error) {
+        if (isMounted) {
+          setTaskError(error instanceof Error ? error.message : "检查提醒失败，请重试。");
+        }
+      }
+    }
+
+    void deliverDueReminders();
+    const intervalId = window.setInterval(() => void deliverDueReminders(), 30_000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
   }, [databaseState]);
 
   useEffect(() => {
@@ -433,6 +480,17 @@ function App() {
       }
 
       const completion = await taskService.completeTask(task.id);
+      if (completion.nextTaskId) {
+        const nextTask = await taskService.getTask(completion.nextTaskId);
+        if (nextTask) {
+          await reminderService.carryReminderToRecurringTask(
+            task.id,
+            task.scheduledStartAt,
+            nextTask.id,
+            nextTask.scheduledStartAt,
+          );
+        }
+      }
       await loadInboxTasks();
       setLastTaskAction({
         kind: "completed",
@@ -572,16 +630,18 @@ function App() {
     setIsSavingTaskDetails(true);
 
     try {
-      const { recurrenceFrequency, ...taskInput } = input;
+      const { recurrenceFrequency, remindAt, ...taskInput } = input;
       const updatedTask = await taskService.updateTask(selectedTask.id, taskInput);
       await taskService.updateRecurrenceRule(
         updatedTask.id,
         recurrenceFrequency ? { frequency: recurrenceFrequency } : null,
       );
+      await reminderService.setTaskReminder(updatedTask.id, remindAt);
       setTasks((currentTasks) =>
         currentTasks.map((task) => (task.id === updatedTask.id ? updatedTask : task)),
       );
       setSelectedTask(null);
+      setSelectedTaskReminder(null);
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
@@ -596,20 +656,33 @@ function App() {
     setTaskError(null);
     setSelectedTask(task);
     setSelectedTaskRecurrence(null);
+    setSelectedTaskReminder(null);
     setSubtasks([]);
     setTaskTags([]);
 
     try {
-      const [activeSubtasks, appliedTags, recurrenceRule] = await Promise.all([
+      const [activeSubtasks, appliedTags, recurrenceRule, reminder] = await Promise.all([
         taskService.listActiveSubtasks(task.id),
         tagService.listTaskTags(task.id),
         taskService.getRecurrenceRule(task.id),
+        reminderService.getPendingReminderForTask(task.id),
       ]);
       setSubtasks(activeSubtasks);
       setTaskTags(appliedTags);
       setSelectedTaskRecurrence(recurrenceRule);
+      setSelectedTaskReminder(reminder);
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取子任务，请重试。");
+    }
+  }
+
+  async function handleRequestNotificationPermission() {
+    setTaskError(null);
+    const permission = await requestNotificationPermission();
+    setNotificationPermission(permission);
+
+    if (permission === "denied") {
+      setTaskError("系统通知未开启。请前往系统设置 → 通知 → PerfectPlan 开启后再试。");
     }
   }
 
@@ -2569,6 +2642,15 @@ function App() {
           </div>
         ) : null}
 
+        {reminderNotice ? (
+          <div className="reminder-toast" role="status">
+            <span>{reminderNotice}</span>
+            <button onClick={() => setReminderNotice(null)} type="button">
+              知道了
+            </button>
+          </div>
+        ) : null}
+
         <footer className={`database-status is-${databaseState}`} aria-live="polite">
           <span aria-hidden="true" className="status-dot" />
           {databaseMessage}
@@ -2817,16 +2899,20 @@ function App() {
             if (!isSavingTaskDetails) {
               setSelectedTask(null);
               setSelectedTaskRecurrence(null);
+              setSelectedTaskReminder(null);
               setTaskError(null);
             }
           }}
           onCompleteSubtask={(subtaskId) => void handleCompleteSubtask(subtaskId)}
           onCreateSubtask={(title) => void handleCreateSubtask(title)}
           onCreateTag={(name) => void handleCreateTag(name)}
+          onRequestNotificationPermission={() => void handleRequestNotificationPermission()}
           onSave={(input) => void handleSaveTaskDetails(input)}
           onToggleTag={(tagId) => void handleToggleTag(tagId)}
+          notificationPermission={notificationPermission}
           projects={projects}
           recurrenceRule={selectedTaskRecurrence}
+          reminder={selectedTaskReminder}
           subtasks={subtasks}
           tags={tags}
           task={selectedTask}
