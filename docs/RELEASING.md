@@ -18,7 +18,7 @@ PerfectPlan 通过 GitHub Actions 的 **Release** 工作流构建 macOS 与 Wind
 2. 在本机运行 `pnpm check`；分别验证 macOS 应用和 Windows 安装包。
 3. 合并到 `main` 后，前往 GitHub Actions，手动运行 **Release**。
 4. 输入与版本严格匹配的标签，例如 `v0.1.0`；Beta 版本保留 `prerelease`。
-5. 工作流依次构建 macOS `.app` 和 Windows `.exe`，并创建或更新同一个草稿 Release。
+5. 工作流依次构建 macOS `.dmg` 和 Windows `.exe`，并创建或更新同一个草稿 Release。
 6. 从草稿 Release 下载两个安装包，在干净设备上安装、启动并确认本地数据不受影响后，再发布 Release。
 
 工作流在校验、macOS 构建或 Windows 构建任一步失败时停止，草稿不会自动发布。

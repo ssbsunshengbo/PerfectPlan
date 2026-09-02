@@ -34,6 +34,9 @@ See [the release guide](./docs/RELEASING.md) for versioning, signing, notarizati
 - [Task model](./docs/TASK_MODEL.md)
 - [Implementation plan](./docs/IMPLEMENTATION_PLAN.md)
 - [Release guide](./docs/RELEASING.md)
+- [Installation and backup guide](./docs/INSTALLATION.md)
+- [Privacy policy](./docs/PRIVACY.md)
+- [Frequently asked questions](./docs/FAQ.md)
 - [Changelog](./CHANGELOG.md)
 
 ## License

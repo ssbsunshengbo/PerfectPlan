@@ -85,7 +85,7 @@ jobs:
           releaseCommitish: ${{ github.sha }}
           releaseDraft: true
           prerelease: ${{ inputs.prerelease }}
-          args: --bundles app
+          args: --bundles dmg
 
   build-windows:
     name: Build Windows installer
