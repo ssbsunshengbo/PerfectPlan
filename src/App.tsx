@@ -1176,7 +1176,6 @@ function MainApp() {
 
   function startCalendarTaskDrag(event: PointerEvent<HTMLElement>, task: TaskRecord) {
     if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
     calendarPointerDragRef.current = {
       hasMoved: false,
       pointerId: event.pointerId,
@@ -2656,6 +2655,7 @@ function MainApp() {
                                     className="calendar-time-task-main"
                                     onClick={(event) => handleCalendarTaskClick(event, task)}
                                     onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
+                                    onPointerDown={(event) => startCalendarTaskDrag(event, task)}
                                     type="button"
                                   >
                                     <span>{formatCalendarTime(task.scheduledStartAt)}</span>
@@ -2664,17 +2664,6 @@ function MainApp() {
                                       {`${task.status === "completed" ? "✓ 已完成 · " : ""}${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
                                     </small>
                                   </button>
-                                  {task.status === "active" ? (
-                                    <button
-                                      aria-label={`拖动「${task.title}」以重新安排时间`}
-                                      className="calendar-task-drag-handle"
-                                      onPointerDown={(event) => startCalendarTaskDrag(event, task)}
-                                      title="拖动以重新安排"
-                                      type="button"
-                                    >
-                                      <span aria-hidden="true">⠿</span>
-                                    </button>
-                                  ) : null}
                                   {calendarResize?.task.id === task.id ? (
                                     <span className="calendar-resize-duration">
                                       {displayedMinutes} 分钟
