@@ -397,7 +397,7 @@ function TaskDetailSection({
         <span>{title}</span>
         <span className="task-detail-section-summary">
           {summary}
-          <i aria-hidden="true">⌄</i>
+          <i aria-hidden="true" />
         </span>
       </button>
       {isOpen ? <div className="task-detail-section-content">{children}</div> : null}

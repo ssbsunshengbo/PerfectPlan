@@ -755,8 +755,8 @@ h1 {
 }
 .inline-subtask-disclosure {
   display: grid;
-  width: 17px;
-  height: 24px;
+  width: 18px;
+  height: 26px;
   flex: 0 0 auto;
   order: -1;
   place-items: center;
@@ -782,33 +782,53 @@ h1 {
 }
 .task-row-subtasks {
   display: grid;
-  width: calc(100% - 38px);
-  flex: 0 0 calc(100% - 38px);
+  width: calc(100% - 58px);
+  flex: 0 0 calc(100% - 58px);
   order: 10;
-  gap: 2px;
-  margin: 1px 0 2px 38px;
-  border-left: 1px solid var(--line);
-  padding: 2px 0 2px 13px;
+  gap: 3px;
+  margin: 4px 0 5px 58px;
+  border-left: 1px solid #d5d9de;
+  padding: 4px 0 4px 16px;
   list-style: none;
 }
 .task-row-subtasks li {
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 29px;
+  gap: 10px;
+  min-height: 34px;
   color: var(--muted);
   font-size: 13px;
+  line-height: 1.4;
 }
 .task-row-subtasks .task-complete-button {
-  width: 17px;
-  height: 17px;
-  border-color: #bcc3ca;
+  width: 28px;
+  height: 28px;
+  margin: -4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+.task-row-subtasks .task-complete-button::before {
+  position: absolute;
+  inset: 5px;
+  border: 1.5px solid #aeb7c1;
+  border-radius: 6px;
+  content: "";
+}
+.task-row-subtasks .task-complete-button:hover::before {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.task-row-subtasks .task-complete-button:hover::after {
+  inset: 5px;
+  line-height: 18px;
+  text-align: center;
 }
 .today-task-row {
   flex-wrap: wrap;
 }
 .today-task-row .task-row-subtasks {
-  margin-left: 31px;
+  margin-left: 48px;
 }
 .tag-input-wrap {
   position: relative;
@@ -3100,21 +3120,17 @@ h1 {
   text-align: right;
 }
 .task-detail-section-summary i {
-  display: grid;
-  width: 18px;
-  height: 18px;
+  width: 0;
+  height: 0;
   flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--panel-soft);
-  color: var(--muted);
-  font-size: 14px;
-  font-style: normal;
-  line-height: 1;
-  transition: transform 140ms ease;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentcolor;
+  opacity: 0.72;
+  transition: transform 130ms ease;
 }
 .task-detail-section.is-open .task-detail-section-summary i {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 .task-detail-section-content {
   display: grid;
@@ -3371,9 +3387,6 @@ h1 {
   }
   .task-detail-actions {
     background: rgb(32 44 39 / 96%);
-  }
-  .task-detail-section-summary i {
-    background: #26342e;
   }
   .task-row:focus-within {
     background: rgb(105 171 134 / 8%);
