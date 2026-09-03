@@ -781,15 +781,30 @@ h1 {
   transform: rotate(90deg);
 }
 .task-row-subtasks {
+  /*
+   * The disclosure, completion control and their two gaps precede the parent
+   * title. Keep the child guide on that same title baseline rather than on
+   * the outer edge of the task row.
+   */
+  --parent-title-offset: 63px;
   display: grid;
-  width: calc(100% - 58px);
-  flex: 0 0 calc(100% - 58px);
+  width: calc(100% - var(--parent-title-offset));
+  flex: 0 0 calc(100% - var(--parent-title-offset));
   order: 10;
   gap: 3px;
-  margin: 4px 0 5px 58px;
+  margin: 4px 0 5px var(--parent-title-offset);
   border-left: 1px solid #d5d9de;
   padding: 4px 0 4px 16px;
   list-style: none;
+}
+
+/*
+ * .task-list ul resets list spacing. Repeat the nested-list rule with a
+ * higher specificity so the hierarchy is not silently flattened in Inbox.
+ */
+.task-list ul.task-row-subtasks {
+  margin: 4px 0 5px var(--parent-title-offset);
+  padding: 4px 0 4px 16px;
 }
 .task-row-subtasks li {
   display: flex;
@@ -828,7 +843,7 @@ h1 {
   flex-wrap: wrap;
 }
 .today-task-row .task-row-subtasks {
-  margin-left: 48px;
+  margin-left: var(--parent-title-offset);
 }
 .tag-input-wrap {
   position: relative;
