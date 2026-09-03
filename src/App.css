@@ -1181,7 +1181,7 @@ h1 {
   border-left: 3px solid var(--task-color);
   border-radius: 7px;
   background: color-mix(in srgb, var(--task-color) 9%, var(--panel));
-  padding: 5px 6px;
+  padding: 5px 24px 5px 6px;
   color: var(--ink);
   overflow: hidden;
   font-size: 11px;
@@ -1247,10 +1247,6 @@ h1 {
 .calendar-time-slot.is-hour {
   border-bottom-color: rgb(195 208 200 / 88%);
 }
-.calendar-time-slot.is-calendar-drop-target {
-  background: rgb(43 115 89 / 13%);
-  box-shadow: inset 0 0 0 2px rgb(43 115 89 / 54%);
-}
 .calendar-time-drop-shadow {
   position: absolute;
   z-index: 4;
@@ -1297,6 +1293,27 @@ h1 {
   z-index: 1;
   opacity: 0.24;
   pointer-events: none;
+}
+.calendar-time-task.is-completed,
+.calendar-all-day-task.is-completed,
+.calendar-month-task.is-completed {
+  border-color: #aeb9b2;
+  border-left-color: #7f9a89;
+  background: #edf3ee;
+  color: #718077;
+  filter: saturate(0.45);
+}
+.calendar-time-task.is-completed .calendar-time-task-main,
+.calendar-time-task.is-completed .calendar-time-task-main strong,
+.calendar-time-task.is-completed .calendar-time-task-main > span,
+.calendar-time-task.is-completed .calendar-time-task-main small,
+.calendar-all-day-task.is-completed,
+.calendar-month-task.is-completed {
+  color: #718077;
+  text-decoration: line-through;
+}
+.calendar-all-day-task.is-completed > span {
+  color: #718077;
 }
 .calendar-time-task.is-after-due {
   border-top-color: #d7a75a;
@@ -1347,6 +1364,31 @@ h1 {
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.calendar-task-drag-handle {
+  position: absolute;
+  z-index: 3;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--faint);
+  cursor: grab;
+  font-size: 13px;
+  line-height: 1;
+}
+.calendar-task-drag-handle:hover,
+.calendar-task-drag-handle:focus-visible {
+  background: color-mix(in srgb, var(--task-color) 22%, var(--panel));
+  color: var(--ink);
+}
+.calendar-task-drag-handle:active {
+  cursor: grabbing;
 }
 .calendar-resize-handle {
   position: absolute;

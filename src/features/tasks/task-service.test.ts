@@ -54,6 +54,15 @@ describe("taskService", () => {
     expect(getDatabase).not.toHaveBeenCalled();
   });
 
+  it("keeps completed tasks available to the calendar", async () => {
+    select.mockResolvedValueOnce([{ ...taskRow, status: "completed" }]);
+
+    const tasks = await taskService.listCalendarTasks();
+
+    expect(tasks[0]?.status).toBe("completed");
+    expect(select.mock.calls[0]?.[0]).toContain("status IN ('active', 'completed')");
+  });
+
   it("marks a one-off task complete and returns the persisted task", async () => {
     select
       .mockResolvedValueOnce([taskRow])

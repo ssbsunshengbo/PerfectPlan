@@ -398,6 +398,18 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
+  async listCalendarTasks(): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status IN ('active', 'completed') AND parent_task_id IS NULL
+       ORDER BY scheduled_date ASC, scheduled_start_at ASC, sort_order ASC, created_at DESC`,
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
   async listActiveTasksScheduledOn(localDate: string): Promise<TaskRecord[]> {
     const database = await getDatabase();
     const rows = await database.select<TaskRow[]>(

@@ -548,13 +548,13 @@ function MainApp() {
 
   async function loadCalendarTasks() {
     const today = toLocalDateValue();
-    const [activeTasks, focusTasks, overdueTasks] = await Promise.all([
-      taskService.listActiveTasks(),
+    const [calendarTasks, focusTasks, overdueTasks] = await Promise.all([
+      taskService.listCalendarTasks(),
       dailyPlanService.listFocusTasks(today),
       taskService.listOverdueActiveTasks(today),
     ]);
 
-    setCalendarTasks(activeTasks);
+    setCalendarTasks(calendarTasks);
     setCalendarFocusTasks(focusTasks);
     setCalendarOverdueTasks(overdueTasks);
   }
@@ -1586,7 +1586,13 @@ function MainApp() {
     ]),
   );
   const calendarDayLoadMinutesByDate = new Map(
-    calendarDates.map((date) => [date, getCalendarDayLoadMinutes(calendarTasks, date)]),
+    calendarDates.map((date) => [
+      date,
+      getCalendarDayLoadMinutes(
+        calendarTasks.filter((task) => task.status === "active"),
+        date,
+      ),
+    ]),
   );
   const calendarTaskLayoutsById = new Map<string, { columnCount: number; columnIndex: number }>();
   const calendarConflictTaskIds = new Set<string>();
@@ -1595,7 +1601,9 @@ function MainApp() {
     getCalendarTaskLayouts(timedTasks).forEach((layout) => {
       calendarTaskLayoutsById.set(layout.id, layout);
     });
-    getCalendarConflictTaskIds(timedTasks).forEach((taskId) => calendarConflictTaskIds.add(taskId));
+    getCalendarConflictTaskIds(timedTasks.filter((task) => task.status === "active")).forEach(
+      (taskId) => calendarConflictTaskIds.add(taskId),
+    );
   });
   const calendarAllDayTasksByDate = new Map(
     calendarDates.map((date) => [
@@ -1611,9 +1619,10 @@ function MainApp() {
   const calendarCandidateTasks = [...calendarTasks]
     .filter(
       (task) =>
-        !task.scheduledDate ||
-        calendarFocusTasks.some((focusTask) => focusTask.id === task.id) ||
-        calendarOverdueTasks.some((overdueTask) => overdueTask.id === task.id),
+        task.status === "active" &&
+        (!task.scheduledDate ||
+          calendarFocusTasks.some((focusTask) => focusTask.id === task.id) ||
+          calendarOverdueTasks.some((overdueTask) => overdueTask.id === task.id)),
     )
     .sort((left, right) => {
       const sourceRank = (task: TaskRecord) =>
@@ -2355,7 +2364,10 @@ function MainApp() {
                         (task) => task.dueDate === date && task.scheduledDate !== date,
                       );
                       const isOverloaded =
-                        getCalendarDayLoadMinutes(calendarTasks, date) > CALENDAR_OVERLOAD_MINUTES;
+                        getCalendarDayLoadMinutes(
+                          calendarTasks.filter((task) => task.status === "active"),
+                          date,
+                        ) > CALENDAR_OVERLOAD_MINUTES;
 
                       return (
                         <div
@@ -2387,18 +2399,24 @@ function MainApp() {
                           ) : null}
                           {scheduledTasks.slice(0, 3).map((task) => (
                             <button
-                              className="calendar-month-task"
+                              className={
+                                task.status === "completed"
+                                  ? "calendar-month-task is-completed"
+                                  : "calendar-month-task"
+                              }
                               key={task.id}
                               onClick={(event) => handleCalendarTaskClick(event, task)}
                               onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
-                              onPointerDown={(event) => startCalendarTaskDrag(event, task)}
+                              onPointerDown={(event) => {
+                                if (task.status === "active") startCalendarTaskDrag(event, task);
+                              }}
                               style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                               type="button"
                             >
                               {task.scheduledStartAt
                                 ? `${formatCalendarTime(task.scheduledStartAt)} `
                                 : ""}
-                              {task.title}
+                              {task.status === "completed" ? `✓ ${task.title}` : task.title}
                             </button>
                           ))}
                           {scheduledTasks.length > 3 ? (
@@ -2489,15 +2507,27 @@ function MainApp() {
                           {allDayTasks.length > 0 ? (
                             allDayTasks.map((task) => (
                               <button
-                                className="calendar-all-day-task"
+                                className={
+                                  task.status === "completed"
+                                    ? "calendar-all-day-task is-completed"
+                                    : "calendar-all-day-task"
+                                }
                                 key={task.id}
                                 onClick={(event) => handleCalendarTaskClick(event, task)}
                                 onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
-                                onPointerDown={(event) => startCalendarTaskDrag(event, task)}
+                                onPointerDown={(event) => {
+                                  if (task.status === "active") startCalendarTaskDrag(event, task);
+                                }}
                                 style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                                 type="button"
                               >
-                                <span>{task.priority === 3 ? "高" : "全天"}</span>
+                                <span>
+                                  {task.status === "completed"
+                                    ? "已完成"
+                                    : task.priority === 3
+                                      ? "高"
+                                      : "全天"}
+                                </span>
                                 {task.title}
                               </button>
                             ))
@@ -2551,11 +2581,6 @@ function MainApp() {
                                 className={[
                                   "calendar-time-slot",
                                   startMinutes % 60 === 0 ? "is-hour" : "",
-                                  calendarDragPreview?.dropDate === date &&
-                                  calendarDragPreview.dropKind === "time" &&
-                                  calendarDragPreview.dropStartMinutes === startMinutes
-                                    ? "is-calendar-drop-target"
-                                    : "",
                                 ]
                                   .filter(Boolean)
                                   .join(" ")}
@@ -2607,6 +2632,7 @@ function MainApp() {
                                     "calendar-time-task",
                                     isAfterDue ? "is-after-due" : "",
                                     isConflict ? "is-conflict" : "",
+                                    task.status === "completed" ? "is-completed" : "",
                                     hasTimezoneMismatch ? "has-timezone-mismatch" : "",
                                     isOutsideGrid ? "is-outside-grid" : "",
                                     calendarDragPreview?.task.id === task.id ? "is-dragging" : "",
@@ -2614,11 +2640,6 @@ function MainApp() {
                                     .filter(Boolean)
                                     .join(" ")}
                                   key={task.id}
-                                  onPointerDown={(event) => {
-                                    if (calendarResize?.task.id !== task.id) {
-                                      startCalendarTaskDrag(event, task);
-                                    }
-                                  }}
                                   style={
                                     {
                                       "--task-color": calendarTaskColor(task),
@@ -2640,9 +2661,20 @@ function MainApp() {
                                     <span>{formatCalendarTime(task.scheduledStartAt)}</span>
                                     <strong>{task.title}</strong>
                                     <small>
-                                      {`${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
+                                      {`${task.status === "completed" ? "✓ 已完成 · " : ""}${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
                                     </small>
                                   </button>
+                                  {task.status === "active" ? (
+                                    <button
+                                      aria-label={`拖动「${task.title}」以重新安排时间`}
+                                      className="calendar-task-drag-handle"
+                                      onPointerDown={(event) => startCalendarTaskDrag(event, task)}
+                                      title="拖动以重新安排"
+                                      type="button"
+                                    >
+                                      <span aria-hidden="true">⠿</span>
+                                    </button>
+                                  ) : null}
                                   {calendarResize?.task.id === task.id ? (
                                     <span className="calendar-resize-duration">
                                       {displayedMinutes} 分钟
