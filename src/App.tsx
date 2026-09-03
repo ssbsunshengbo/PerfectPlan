@@ -88,6 +88,7 @@ type CalendarDragPreview = {
   clientY: number;
   dropDate: string | null;
   dropKind: "all-day" | "time" | null;
+  dropStartMinutes: number | null;
   task: TaskRecord;
 };
 const quickRescheduleOptions: Array<{ label: string; target: QuickRescheduleTarget }> = [
@@ -1153,7 +1154,10 @@ function MainApp() {
         );
       } else {
         const normalizedStart = snapCalendarStart(startMinutes);
-        const estimatedMinutes = snapCalendarDuration(normalizedStart, task.estimatedMinutes ?? 30);
+        const estimatedMinutes = snapCalendarDuration(
+          normalizedStart,
+          task.scheduledStartAt ? (task.estimatedMinutes ?? 60) : 60,
+        );
         await saveCalendarSchedule(
           task,
           {
@@ -1207,7 +1211,10 @@ function MainApp() {
       const rawDropKind = target?.dataset.calendarDropKind;
       const dropKind: CalendarDragPreview["dropKind"] =
         rawDropKind === "time" || rawDropKind === "all-day" ? rawDropKind : null;
-      return { dropDate, dropKind, target };
+      const rawDropStartMinutes = Number(target?.dataset.calendarDropStartMinutes);
+      const dropStartMinutes =
+        dropKind === "time" && Number.isFinite(rawDropStartMinutes) ? rawDropStartMinutes : null;
+      return { dropDate, dropKind, dropStartMinutes, target };
     }
 
     function updatePointerDrag(event: globalThis.PointerEvent) {
@@ -1220,12 +1227,13 @@ function MainApp() {
         document.body.style.userSelect = "none";
       }
 
-      const { dropDate, dropKind } = getDropTarget(event.clientX, event.clientY);
+      const { dropDate, dropKind, dropStartMinutes } = getDropTarget(event.clientX, event.clientY);
       setCalendarDragPreview({
         clientX: event.clientX,
         clientY: event.clientY,
         dropDate,
         dropKind,
+        dropStartMinutes,
         task: drag.task,
       });
     }
@@ -1242,11 +1250,16 @@ function MainApp() {
         suppressCalendarTaskClickRef.current = false;
       }, 0);
 
-      const { dropDate, dropKind, target } = getDropTarget(event.clientX, event.clientY);
+      const { dropDate, dropKind, dropStartMinutes, target } = getDropTarget(
+        event.clientX,
+        event.clientY,
+      );
       if (!dropDate || !dropKind || !target) return;
 
       const startMinutes =
-        dropKind === "time" ? event.clientY - target.getBoundingClientRect().top + 6 * 60 : null;
+        dropKind === "time"
+          ? (dropStartMinutes ?? event.clientY - target.getBoundingClientRect().top + 6 * 60)
+          : null;
       scheduleCalendarPointerDrop(drag.task, dropDate, startMinutes);
     }
 
@@ -1616,6 +1629,7 @@ function MainApp() {
       );
     });
   const calendarHours = Array.from({ length: 18 }, (_, index) => index + 6);
+  const calendarHalfHourSlots = Array.from({ length: 36 }, (_, index) => 6 * 60 + index * 30);
   const calendarBoardMinWidth = calendarViewMode === "week" ? 670 : 360;
 
   function upcomingDisplayDate(task: TaskRecord): string | null {
@@ -2506,16 +2520,32 @@ function MainApp() {
 
                         return (
                           <div
-                            className={
-                              calendarDragPreview?.dropDate === date &&
-                              calendarDragPreview.dropKind === "time"
-                                ? "calendar-time-column is-calendar-drop-target"
-                                : "calendar-time-column"
-                            }
+                            className="calendar-time-column"
                             data-calendar-drop-date={date}
                             data-calendar-drop-kind="time"
                             key={date}
                           >
+                            {calendarHalfHourSlots.map((startMinutes) => (
+                              <div
+                                aria-hidden="true"
+                                className={[
+                                  "calendar-time-slot",
+                                  startMinutes % 60 === 0 ? "is-hour" : "",
+                                  calendarDragPreview?.dropDate === date &&
+                                  calendarDragPreview.dropKind === "time" &&
+                                  calendarDragPreview.dropStartMinutes === startMinutes
+                                    ? "is-calendar-drop-target"
+                                    : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")}
+                                data-calendar-drop-date={date}
+                                data-calendar-drop-kind="time"
+                                data-calendar-drop-start-minutes={startMinutes}
+                                key={startMinutes}
+                                style={{ top: `${startMinutes - 6 * 60}px` }}
+                              />
+                            ))}
                             {timedTasks.map((task) => {
                               const estimatedMinutes = task.estimatedMinutes ?? 30;
                               const offsetMinutes = calendarTimeOffset(task.scheduledStartAt);
@@ -2577,13 +2607,19 @@ function MainApp() {
                                       {`${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
                                     </small>
                                   </button>
+                                  {calendarResize?.task.id === task.id ? (
+                                    <span className="calendar-resize-duration">
+                                      {displayedMinutes} 分钟
+                                    </span>
+                                  ) : null}
                                   <button
-                                    aria-label={`拉伸「${task.title}」的时长`}
+                                    aria-label={`上下拖动以调整「${task.title}」的时长`}
                                     className="calendar-resize-handle"
                                     onPointerCancel={() => setCalendarResize(null)}
                                     onPointerDown={(event) => startCalendarResize(event, task)}
                                     onPointerMove={updateCalendarResize}
                                     onPointerUp={endCalendarResize}
+                                    title="上下拖动调整时长（每格 30 分钟）"
                                     type="button"
                                   />
                                 </div>

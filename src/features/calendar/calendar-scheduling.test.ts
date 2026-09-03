@@ -16,8 +16,8 @@ import {
 } from "./calendar-scheduling";
 
 describe("calendar scheduling", () => {
-  it("snaps time-grid drops to 15-minute increments and keeps them within one day", () => {
-    expect(snapCalendarStart(6 * 60 + 8)).toBe(6 * 60 + 15);
+  it("snaps time-grid drops to 30-minute increments and keeps them within one day", () => {
+    expect(snapCalendarStart(6 * 60 + 8)).toBe(6 * 60);
     expect(snapCalendarStart(23 * 60 + 45)).toBe(CALENDAR_LAST_START_MINUTES);
     expect(snapCalendarStart(2 * 60)).toBe(6 * 60);
   });
@@ -25,7 +25,7 @@ describe("calendar scheduling", () => {
   it("keeps resized blocks at least 30 minutes and never across midnight", () => {
     expect(snapCalendarDuration(9 * 60, 19)).toBe(30);
     expect(snapCalendarDuration(23 * 60 + 30, 90)).toBe(30);
-    expect(snapCalendarDuration(20 * 60, 47)).toBe(45);
+    expect(snapCalendarDuration(20 * 60, 47)).toBe(60);
   });
 
   it("creates and reads a local calendar start time", () => {

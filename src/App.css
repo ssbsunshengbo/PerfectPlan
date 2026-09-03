@@ -1228,15 +1228,32 @@ h1 {
   position: relative;
   min-height: 1080px;
   border-right: 1px solid var(--line);
-  background-image: linear-gradient(to bottom, rgb(215 225 218 / 84%) 1px, transparent 1px);
-  background-size: 100% 60px;
+  background: rgb(255 254 250 / 32%);
 }
 .calendar-time-column:last-child {
   border-right: 0;
 }
+.calendar-time-slot {
+  position: absolute;
+  z-index: 0;
+  right: 0;
+  left: 0;
+  height: 30px;
+  border-bottom: 1px solid rgb(215 225 218 / 48%);
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+.calendar-time-slot.is-hour {
+  border-bottom-color: rgb(195 208 200 / 88%);
+}
+.calendar-time-slot.is-calendar-drop-target {
+  background: rgb(43 115 89 / 13%);
+  box-shadow: inset 0 0 0 2px rgb(43 115 89 / 54%);
+}
 .calendar-time-task {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   left: 5px;
   right: auto;
   min-height: 30px;
@@ -1305,9 +1322,9 @@ h1 {
 .calendar-resize-handle {
   position: absolute;
   right: 7px;
-  bottom: -4px;
+  bottom: -5px;
   left: 7px;
-  height: 9px;
+  height: 11px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -1316,17 +1333,29 @@ h1 {
 .calendar-resize-handle::after {
   position: absolute;
   right: 0;
-  bottom: 2px;
-  left: 0;
-  height: 2px;
+  bottom: 3px;
+  left: 2px;
+  height: 3px;
   border-radius: 99px;
   background: color-mix(in srgb, var(--task-color) 70%, #fff);
   content: "";
-  opacity: 0;
+  opacity: 0.38;
 }
 .calendar-time-task:hover .calendar-resize-handle::after,
 .calendar-resize-handle:focus-visible::after {
   opacity: 1;
+}
+.calendar-resize-duration {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--task-color) 28%, var(--panel));
+  padding: 2px 5px;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 760;
+  pointer-events: none;
 }
 .calendar-candidate-task,
 .calendar-all-day-task,

@@ -1,7 +1,7 @@
 export const CALENDAR_GRID_START_MINUTES = 6 * 60;
 export const CALENDAR_LAST_START_MINUTES = 23 * 60 + 30;
 export const CALENDAR_MIN_DURATION_MINUTES = 30;
-export const CALENDAR_SNAP_MINUTES = 15;
+export const CALENDAR_SNAP_MINUTES = 30;
 export const CALENDAR_OVERLOAD_MINUTES = 8 * 60;
 
 export type CalendarTaskTimeInput = {
