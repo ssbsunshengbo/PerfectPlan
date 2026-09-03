@@ -978,7 +978,7 @@ h1 {
 }
 .calendar-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 238px;
+  grid-template-columns: minmax(0, 1fr) minmax(184px, 216px);
   align-items: start;
   gap: 15px;
 }
@@ -1328,10 +1328,50 @@ h1 {
 .calendar-resize-handle:focus-visible::after {
   opacity: 1;
 }
-.calendar-candidate-task[draggable="true"],
-.calendar-all-day-task[draggable="true"],
-.calendar-month-task[draggable="true"] {
+.calendar-candidate-task,
+.calendar-all-day-task,
+.calendar-month-task,
+.calendar-time-task {
   cursor: grab;
+}
+.calendar-candidate-task:active,
+.calendar-all-day-task:active,
+.calendar-month-task:active,
+.calendar-time-task:active {
+  cursor: grabbing;
+}
+.calendar-month-day.is-calendar-drop-target,
+.calendar-all-day-cell.is-calendar-drop-target,
+.calendar-time-column.is-calendar-drop-target {
+  background-color: rgb(43 115 89 / 9%);
+  box-shadow: inset 0 0 0 2px rgb(43 115 89 / 45%);
+}
+.calendar-drag-preview {
+  position: fixed;
+  z-index: 50;
+  display: grid;
+  max-width: min(250px, calc(100vw - 32px));
+  gap: 2px;
+  transform: translate(calc(var(--drag-x) + 14px), calc(var(--drag-y) + 14px));
+  border: 1px solid color-mix(in srgb, var(--task-color) 42%, transparent);
+  border-left: 3px solid var(--task-color);
+  border-radius: 9px;
+  background: rgb(255 254 250 / 96%);
+  box-shadow: 0 10px 24px rgb(35 53 44 / 16%);
+  padding: 8px 10px;
+  color: var(--ink);
+  pointer-events: none;
+}
+.calendar-drag-preview span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 720;
+}
+.calendar-drag-preview strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .calendar-candidates {
   position: sticky;
@@ -2792,16 +2832,7 @@ h1 {
     padding: 28px;
   }
 }
-@media (max-width: 1180px) {
-  .calendar-layout {
-    grid-template-columns: 1fr;
-  }
-  .calendar-candidates {
-    position: static;
-    max-height: none;
-  }
-}
-@container (max-width: 960px) {
+@container (max-width: 560px) {
   .calendar-layout {
     grid-template-columns: 1fr;
   }
