@@ -295,17 +295,24 @@ function InlineSubtaskDisclosure({
       </button>
       {isExpanded ? (
         <ul className="task-row-subtasks" id={subtaskListId}>
-          {subtasks.map((subtask) => (
-            <li key={subtask.id}>
-              <button
-                aria-label={`完成子任务：${subtask.title}`}
-                className="task-complete-button"
-                onClick={() => onComplete(subtask)}
-                type="button"
-              />
-              <span>{subtask.title}</span>
-            </li>
-          ))}
+          {subtasks.map((subtask) => {
+            const isCompleted = subtask.status === "completed";
+
+            return (
+              <li className={isCompleted ? "is-completed" : ""} key={subtask.id}>
+                <button
+                  aria-label={`${isCompleted ? "已完成" : "完成"}子任务：${subtask.title}`}
+                  className={
+                    isCompleted ? "task-complete-button is-completed" : "task-complete-button"
+                  }
+                  disabled={isCompleted}
+                  onClick={() => onComplete(subtask)}
+                  type="button"
+                />
+                <span>{subtask.title}</span>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </>
@@ -479,7 +486,7 @@ function MainApp() {
       };
     }
 
-    void taskService.listActiveSubtasksByParentIds(visibleParentTaskIds).then((nextSubtasks) => {
+    void taskService.listSubtasksByParentIds(visibleParentTaskIds).then((nextSubtasks) => {
       if (isMounted) setSubtasksByParentId(nextSubtasks);
     });
 
@@ -981,13 +988,13 @@ function MainApp() {
     setTaskTags([]);
 
     try {
-      const [activeSubtasks, appliedTags, recurrenceRule, reminder] = await Promise.all([
-        taskService.listActiveSubtasks(task.id),
+      const [taskSubtasks, appliedTags, recurrenceRule, reminder] = await Promise.all([
+        taskService.listSubtasks(task.id),
         tagService.listTaskTags(task.id),
         taskService.getRecurrenceRule(task.id),
         reminderService.getPendingReminderForTask(task.id),
       ]);
-      setSubtasks(activeSubtasks);
+      setSubtasks(taskSubtasks);
       setTaskTags(appliedTags);
       setSelectedTaskRecurrence(recurrenceRule);
       setSelectedTaskReminder(reminder);
@@ -1032,16 +1039,18 @@ function MainApp() {
     setIsSavingSubtask(true);
 
     try {
-      await taskService.completeTask(subtaskId);
+      const completion = await taskService.completeTask(subtaskId);
       setSubtasks((currentSubtasks) =>
-        currentSubtasks.filter((subtask) => subtask.id !== subtaskId),
+        currentSubtasks.map((subtask) => (subtask.id === subtaskId ? completion.task : subtask)),
       );
       if (selectedTask) {
         setSubtasksByParentId((currentSubtasks) => {
           const nextSubtasks = new Map(currentSubtasks);
           nextSubtasks.set(
             selectedTask.id,
-            (nextSubtasks.get(selectedTask.id) ?? []).filter((subtask) => subtask.id !== subtaskId),
+            (nextSubtasks.get(selectedTask.id) ?? []).map((subtask) =>
+              subtask.id === subtaskId ? completion.task : subtask,
+            ),
           );
           return nextSubtasks;
         });
@@ -1069,20 +1078,22 @@ function MainApp() {
     setTaskError(null);
 
     try {
-      await taskService.completeTask(subtask.id);
+      const completion = await taskService.completeTask(subtask.id);
       setSubtasksByParentId((currentSubtasks) => {
         const nextSubtasks = new Map(currentSubtasks);
         nextSubtasks.set(
           parentTaskId,
-          (nextSubtasks.get(parentTaskId) ?? []).filter(
-            (currentSubtask) => currentSubtask.id !== subtask.id,
+          (nextSubtasks.get(parentTaskId) ?? []).map((currentSubtask) =>
+            currentSubtask.id === subtask.id ? completion.task : currentSubtask,
           ),
         );
         return nextSubtasks;
       });
       if (selectedTask?.id === parentTaskId) {
         setSubtasks((currentSubtasks) =>
-          currentSubtasks.filter((currentSubtask) => currentSubtask.id !== subtask.id),
+          currentSubtasks.map((currentSubtask) =>
+            currentSubtask.id === subtask.id ? completion.task : currentSubtask,
+          ),
         );
       }
     } catch (error) {

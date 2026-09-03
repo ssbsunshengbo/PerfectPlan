@@ -566,7 +566,20 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
-  async listActiveSubtasksByParentIds(parentTaskIds: string[]): Promise<Map<string, TaskRecord[]>> {
+  async listSubtasks(parentTaskId: string): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status IN ('active', 'completed') AND parent_task_id = $1
+       ORDER BY status = 'completed' ASC, sort_order ASC, created_at ASC`,
+      [parentTaskId],
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
+  async listSubtasksByParentIds(parentTaskIds: string[]): Promise<Map<string, TaskRecord[]>> {
     const uniqueParentTaskIds = [...new Set(parentTaskIds)];
     if (uniqueParentTaskIds.length === 0) return new Map();
 
@@ -575,8 +588,8 @@ export const taskService = {
     const rows = await database.select<TaskRow[]>(
       `SELECT ${taskSelectFields}
        FROM tasks
-       WHERE status = 'active' AND parent_task_id IN (${placeholders})
-       ORDER BY parent_task_id ASC, sort_order ASC, created_at ASC`,
+       WHERE status IN ('active', 'completed') AND parent_task_id IN (${placeholders})
+       ORDER BY parent_task_id ASC, status = 'completed' ASC, sort_order ASC, created_at ASC`,
       uniqueParentTaskIds,
     );
 

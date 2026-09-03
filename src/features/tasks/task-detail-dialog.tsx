@@ -841,18 +841,24 @@ export function TaskDetailDialog({
         >
           {subtasks.length > 0 ? (
             <ul className="subtask-list">
-              {subtasks.map((subtask) => (
-                <li key={subtask.id}>
-                  <button
-                    aria-label={`完成子任务：${subtask.title}`}
-                    className="task-complete-button"
-                    disabled={isSavingSubtask}
-                    onClick={() => onCompleteSubtask(subtask.id)}
-                    type="button"
-                  />
-                  <span>{subtask.title}</span>
-                </li>
-              ))}
+              {subtasks.map((subtask) => {
+                const isCompleted = subtask.status === "completed";
+
+                return (
+                  <li className={isCompleted ? "is-completed" : ""} key={subtask.id}>
+                    <button
+                      aria-label={`${isCompleted ? "已完成" : "完成"}子任务：${subtask.title}`}
+                      className={
+                        isCompleted ? "task-complete-button is-completed" : "task-complete-button"
+                      }
+                      disabled={isSavingSubtask || isCompleted}
+                      onClick={() => onCompleteSubtask(subtask.id)}
+                      type="button"
+                    />
+                    <span>{subtask.title}</span>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="subtask-empty">把一件大事拆成几个可执行的小步骤。</p>
