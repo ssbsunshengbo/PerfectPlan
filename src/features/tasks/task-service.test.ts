@@ -63,6 +63,15 @@ describe("taskService", () => {
     expect(select.mock.calls[0]?.[0]).toContain("status IN ('active', 'completed')");
   });
 
+  it("keeps completed root tasks available in the task list", async () => {
+    select.mockResolvedValueOnce([{ ...taskRow, status: "completed" }]);
+
+    const tasks = await taskService.listTasks();
+
+    expect(tasks[0]?.status).toBe("completed");
+    expect(select.mock.calls[0]?.[0]).toContain("status IN ('active', 'completed')");
+  });
+
   it("marks a one-off task complete and returns the persisted task", async () => {
     select
       .mockResolvedValueOnce([taskRow])
@@ -292,10 +301,10 @@ describe("taskService", () => {
     expect(select.mock.calls[0]?.[1]).toHaveLength(2);
   });
 
-  it("searches task titles and notes with project, priority and tag filters", async () => {
+  it("searches active and completed task titles and notes with project, priority and tag filters", async () => {
     select.mockResolvedValueOnce([taskRow]);
 
-    const tasks = await taskService.searchActiveTasks({
+    const tasks = await taskService.searchTasks({
       priority: 2,
       projectId: "project-1",
       query: "计划_2026%",
@@ -303,6 +312,7 @@ describe("taskService", () => {
     });
 
     expect(tasks).toHaveLength(1);
+    expect(select.mock.calls[0]?.[0]).toContain("status IN ('active', 'completed')");
     expect(select.mock.calls[0]?.[0]).toContain("title LIKE $1 ESCAPE '\\'");
     expect(select.mock.calls[0]?.[0]).toContain("project_id IS $2");
     expect(select.mock.calls[0]?.[0]).toContain("priority = $3");

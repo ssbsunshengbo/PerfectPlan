@@ -398,6 +398,18 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
+  async listTasks(): Promise<TaskRecord[]> {
+    const database = await getDatabase();
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status IN ('active', 'completed') AND parent_task_id IS NULL
+       ORDER BY status = 'completed' ASC, sort_order ASC, created_at DESC`,
+    );
+
+    return rows.map(toTaskRecord);
+  },
+
   async listCalendarTasks(): Promise<TaskRecord[]> {
     const database = await getDatabase();
     const rows = await database.select<TaskRow[]>(
@@ -429,7 +441,7 @@ export const taskService = {
     const rows = await database.select<TaskRow[]>(
       `SELECT ${taskSelectFields}
        FROM tasks
-       WHERE status = 'active'
+       WHERE status IN ('active', 'completed')
          AND parent_task_id IS NULL
          AND (
            scheduled_date BETWEEN $1 AND $2
@@ -439,7 +451,8 @@ export const taskService = {
          CASE
            WHEN scheduled_date BETWEEN $1 AND $2 THEN scheduled_date
            ELSE due_date
-         END ASC,
+       END ASC,
+         status = 'completed' ASC,
          scheduled_start_at IS NULL ASC,
          scheduled_start_at ASC,
          priority DESC,
@@ -503,9 +516,9 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
-  async searchActiveTasks(filters: TaskSearchFilters = {}): Promise<TaskRecord[]> {
+  async searchTasks(filters: TaskSearchFilters = {}): Promise<TaskRecord[]> {
     const database = await getDatabase();
-    const clauses = ["status = 'active'", "parent_task_id IS NULL"];
+    const clauses = ["status IN ('active', 'completed')", "parent_task_id IS NULL"];
     const values: Array<string | number | null> = [];
 
     if (filters.query?.trim()) {
@@ -534,7 +547,7 @@ export const taskService = {
       `SELECT ${taskSelectFields}
        FROM tasks
        WHERE ${clauses.join(" AND ")}
-       ORDER BY sort_order ASC, created_at DESC`,
+       ORDER BY status = 'completed' ASC, sort_order ASC, created_at DESC`,
       values,
     );
 

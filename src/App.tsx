@@ -529,17 +529,17 @@ function MainApp() {
           return;
         }
 
-        const [activeTasks, activeProjects, availableTags] = await Promise.all([
-          taskService.listActiveTasks(),
+        const [listedTasks, activeProjects, availableTags] = await Promise.all([
+          taskService.listTasks(),
           projectService.listProjects(),
           tagService.listTags(),
         ]);
         const initialTaskTags = await tagService.listTaskTagsByTaskIds(
-          activeTasks.map((task) => task.id),
+          listedTasks.map((task) => task.id),
         );
         if (!isMounted) return;
 
-        setTasks(activeTasks);
+        setTasks(listedTasks);
         setTaskTagsById(initialTaskTags);
         setProjects(activeProjects);
         setTags(availableTags);
@@ -640,14 +640,14 @@ function MainApp() {
     selectedProjectId = projectFilter,
     selectedPriority = priorityFilter,
   ) {
-    const activeTasks = await taskService.searchActiveTasks({
+    const listedTasks = await taskService.searchTasks({
       priority: selectedPriority === "all" ? undefined : selectedPriority,
       projectId: selectedProjectId === "all" ? undefined : selectedProjectId || null,
       query,
       tagId: tagId ?? undefined,
     });
-    const nextTaskTags = await tagService.listTaskTagsByTaskIds(activeTasks.map((task) => task.id));
-    setTasks(activeTasks);
+    const nextTaskTags = await tagService.listTaskTagsByTaskIds(listedTasks.map((task) => task.id));
+    setTasks(listedTasks);
     setTaskTagsById(nextTaskTags);
   }
 
@@ -2152,52 +2152,68 @@ function MainApp() {
                     <ul className="today-task-list">
                       {upcomingTasks
                         .filter((task) => upcomingDisplayDate(task) === selectedUpcomingDate)
-                        .map((task) => (
-                          <li className="today-task-row" key={task.id}>
-                            <button
-                              aria-label={`完成任务：${task.title}`}
-                              className="task-complete-button"
-                              onClick={() => void handleCompleteTask(task)}
-                              type="button"
-                            />
-                            <button
-                              className="task-title"
-                              onClick={() => void openTaskDetails(task)}
-                              type="button"
+                        .map((task) => {
+                          const isCompleted = task.status === "completed";
+
+                          return (
+                            <li
+                              className={
+                                isCompleted ? "today-task-row is-completed" : "today-task-row"
+                              }
+                              key={task.id}
                             >
-                              {task.title}
-                            </button>
-                            <QuickRescheduleButton
-                              onReschedule={(selectedTask, target) =>
-                                void handleQuickReschedule(selectedTask, target)
-                              }
-                              task={task}
-                            />
-                            {task.scheduledDate === selectedUpcomingDate ? (
-                              <span className="upcoming-task-chip">计划</span>
-                            ) : null}
-                            {task.dueDate === selectedUpcomingDate ? (
-                              <span className="upcoming-task-chip is-due">截止</span>
-                            ) : task.dueDate &&
-                              task.dueDate >= upcomingStartDate &&
-                              task.dueDate <= upcomingEndDate ? (
-                              <span className="upcoming-task-chip">
-                                截止 {task.dueDate.slice(5)}
-                              </span>
-                            ) : task.dueDate && task.dueDate < upcomingStartDate ? (
-                              <span className="upcoming-task-chip is-due">已逾期</span>
-                            ) : null}
-                            <InlineSubtaskDisclosure
-                              isExpanded={expandedSubtaskParentIds.has(task.id)}
-                              onComplete={(subtask) =>
-                                void handleCompleteInlineSubtask(task.id, subtask)
-                              }
-                              onToggle={() => toggleInlineSubtasks(task.id)}
-                              parentTask={task}
-                              subtasks={subtasksByParentId.get(task.id) ?? []}
-                            />
-                          </li>
-                        ))}
+                              <button
+                                aria-label={`${isCompleted ? "已完成" : "完成"}任务：${task.title}`}
+                                className={
+                                  isCompleted
+                                    ? "task-complete-button is-completed"
+                                    : "task-complete-button"
+                                }
+                                disabled={isCompleted}
+                                onClick={() => void handleCompleteTask(task)}
+                                type="button"
+                              />
+                              <button
+                                className="task-title"
+                                onClick={() => void openTaskDetails(task)}
+                                type="button"
+                              >
+                                {task.title}
+                              </button>
+                              {!isCompleted ? (
+                                <QuickRescheduleButton
+                                  onReschedule={(selectedTask, target) =>
+                                    void handleQuickReschedule(selectedTask, target)
+                                  }
+                                  task={task}
+                                />
+                              ) : null}
+                              {task.scheduledDate === selectedUpcomingDate ? (
+                                <span className="upcoming-task-chip">计划</span>
+                              ) : null}
+                              {task.dueDate === selectedUpcomingDate ? (
+                                <span className="upcoming-task-chip is-due">截止</span>
+                              ) : task.dueDate &&
+                                task.dueDate >= upcomingStartDate &&
+                                task.dueDate <= upcomingEndDate ? (
+                                <span className="upcoming-task-chip">
+                                  截止 {task.dueDate.slice(5)}
+                                </span>
+                              ) : task.dueDate && task.dueDate < upcomingStartDate ? (
+                                <span className="upcoming-task-chip is-due">已逾期</span>
+                              ) : null}
+                              <InlineSubtaskDisclosure
+                                isExpanded={expandedSubtaskParentIds.has(task.id)}
+                                onComplete={(subtask) =>
+                                  void handleCompleteInlineSubtask(task.id, subtask)
+                                }
+                                onToggle={() => toggleInlineSubtasks(task.id)}
+                                parentTask={task}
+                                subtasks={subtasksByParentId.get(task.id) ?? []}
+                              />
+                            </li>
+                          );
+                        })}
                     </ul>
                   ) : (
                     <p className="upcoming-selected-empty">这天没有已计划或临近截止的任务。</p>
@@ -3156,72 +3172,84 @@ function MainApp() {
             ) : null}
             {tasks.length > 0 ? (
               <ul>
-                {tasks.map((task) => (
-                  <li className="task-row" key={task.id}>
-                    <button
-                      aria-label={`完成任务：${task.title}`}
-                      aria-keyshortcuts="Space"
-                      className="task-complete-button"
-                      onClick={() => void handleCompleteTask(task)}
-                      type="button"
-                    />
-                    <button
-                      aria-keyshortcuts="Enter Space Delete Backspace"
-                      className="task-title"
-                      onClick={() => void openTaskDetails(task)}
-                      onKeyDown={(event) => {
-                        if (event.key === " ") {
-                          event.preventDefault();
-                          void handleCompleteTask(task);
-                        }
-                        if (event.key === "Delete" || event.key === "Backspace") {
-                          event.preventDefault();
-                          requestTrashTask(task);
-                        }
-                      }}
-                      type="button"
+                {tasks.map((task) => {
+                  const isCompleted = task.status === "completed";
+
+                  return (
+                    <li
+                      className={isCompleted ? "task-row is-completed" : "task-row"}
+                      key={task.id}
                     >
-                      {task.title}
-                    </button>
-                    {(taskTagsById.get(task.id) ?? []).length > 0 ? (
-                      <div aria-label={`${task.title} 的标签`} className="task-row-tags">
-                        {(taskTagsById.get(task.id) ?? []).map((tag) => (
-                          <button
-                            className="task-tag"
-                            key={tag.id}
-                            onClick={() => void handleTagFilter(tag.id)}
-                            style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
-                            title={`筛选标签：${tag.name}`}
-                            type="button"
-                          >
-                            {tag.name}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                    <QuickRescheduleButton
-                      onReschedule={(selectedTask, target) =>
-                        void handleQuickReschedule(selectedTask, target)
-                      }
-                      task={task}
-                    />
-                    <button
-                      aria-label={`删除任务：${task.title}`}
-                      className="task-delete-button"
-                      onClick={() => requestTrashTask(task)}
-                      type="button"
-                    >
-                      删除
-                    </button>
-                    <InlineSubtaskDisclosure
-                      isExpanded={expandedSubtaskParentIds.has(task.id)}
-                      onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
-                      onToggle={() => toggleInlineSubtasks(task.id)}
-                      parentTask={task}
-                      subtasks={subtasksByParentId.get(task.id) ?? []}
-                    />
-                  </li>
-                ))}
+                      <button
+                        aria-label={`${isCompleted ? "已完成" : "完成"}任务：${task.title}`}
+                        aria-keyshortcuts="Space"
+                        className={
+                          isCompleted ? "task-complete-button is-completed" : "task-complete-button"
+                        }
+                        disabled={isCompleted}
+                        onClick={() => void handleCompleteTask(task)}
+                        type="button"
+                      />
+                      <button
+                        aria-keyshortcuts="Enter Space Delete Backspace"
+                        className="task-title"
+                        onClick={() => void openTaskDetails(task)}
+                        onKeyDown={(event) => {
+                          if (event.key === " " && !isCompleted) {
+                            event.preventDefault();
+                            void handleCompleteTask(task);
+                          }
+                          if (event.key === "Delete" || event.key === "Backspace") {
+                            event.preventDefault();
+                            requestTrashTask(task);
+                          }
+                        }}
+                        type="button"
+                      >
+                        {task.title}
+                      </button>
+                      {(taskTagsById.get(task.id) ?? []).length > 0 ? (
+                        <div aria-label={`${task.title} 的标签`} className="task-row-tags">
+                          {(taskTagsById.get(task.id) ?? []).map((tag) => (
+                            <button
+                              className="task-tag"
+                              key={tag.id}
+                              onClick={() => void handleTagFilter(tag.id)}
+                              style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
+                              title={`筛选标签：${tag.name}`}
+                              type="button"
+                            >
+                              {tag.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                      {!isCompleted ? (
+                        <QuickRescheduleButton
+                          onReschedule={(selectedTask, target) =>
+                            void handleQuickReschedule(selectedTask, target)
+                          }
+                          task={task}
+                        />
+                      ) : null}
+                      <button
+                        aria-label={`删除任务：${task.title}`}
+                        className="task-delete-button"
+                        onClick={() => requestTrashTask(task)}
+                        type="button"
+                      >
+                        删除
+                      </button>
+                      <InlineSubtaskDisclosure
+                        isExpanded={expandedSubtaskParentIds.has(task.id)}
+                        onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
+                        onToggle={() => toggleInlineSubtasks(task.id)}
+                        parentTask={task}
+                        subtasks={subtasksByParentId.get(task.id) ?? []}
+                      />
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="project-empty">没有匹配当前搜索或筛选条件的待完成任务。</p>

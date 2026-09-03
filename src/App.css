@@ -681,6 +681,16 @@ h1 {
   background: #f8f9fb;
   box-shadow: inset 3px 0 0 var(--accent);
 }
+.task-row.is-completed,
+.today-task-row.is-completed {
+  background: rgb(248 250 247 / 72%);
+}
+.task-row.is-completed .task-title,
+.today-task-row.is-completed .task-title {
+  color: var(--faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--faint) 56%, transparent);
+}
 .task-row:last-child,
 .project-list li:last-child {
   border-bottom: 0;
