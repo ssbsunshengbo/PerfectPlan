@@ -566,6 +566,30 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
+  async listActiveSubtasksByParentIds(parentTaskIds: string[]): Promise<Map<string, TaskRecord[]>> {
+    const uniqueParentTaskIds = [...new Set(parentTaskIds)];
+    if (uniqueParentTaskIds.length === 0) return new Map();
+
+    const database = await getDatabase();
+    const placeholders = uniqueParentTaskIds.map((_, index) => `$${index + 1}`).join(", ");
+    const rows = await database.select<TaskRow[]>(
+      `SELECT ${taskSelectFields}
+       FROM tasks
+       WHERE status = 'active' AND parent_task_id IN (${placeholders})
+       ORDER BY parent_task_id ASC, sort_order ASC, created_at ASC`,
+      uniqueParentTaskIds,
+    );
+
+    return rows.reduce((result, row) => {
+      if (!row.parent_task_id) return result;
+
+      const currentSubtasks = result.get(row.parent_task_id) ?? [];
+      currentSubtasks.push(toTaskRecord(row));
+      result.set(row.parent_task_id, currentSubtasks);
+      return result;
+    }, new Map<string, TaskRecord[]>());
+  },
+
   async createSubtask(parentTaskId: string, title: string): Promise<TaskRecord> {
     const parentTask = await requireTask(parentTaskId);
 

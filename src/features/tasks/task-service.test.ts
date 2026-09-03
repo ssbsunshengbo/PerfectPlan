@@ -210,6 +210,24 @@ describe("taskService", () => {
     expect(select.mock.calls[0]?.[0]).toContain("status = 'trashed' AND parent_task_id IS NULL");
   });
 
+  it("loads active subtasks for visible parent tasks in one query", async () => {
+    select.mockResolvedValueOnce([
+      { ...taskRow, id: "subtask-1", parent_task_id: "task-1", title: "整理资料" },
+      { ...taskRow, id: "subtask-2", parent_task_id: "task-2", title: "发送邮件" },
+    ]);
+
+    const subtasksByParentId = await taskService.listActiveSubtasksByParentIds([
+      "task-1",
+      "task-2",
+      "task-1",
+    ]);
+
+    expect(select.mock.calls[0]?.[0]).toContain("parent_task_id IN ($1, $2)");
+    expect(select.mock.calls[0]?.[1]).toEqual(["task-1", "task-2"]);
+    expect(subtasksByParentId.get("task-1")?.[0]?.title).toBe("整理资料");
+    expect(subtasksByParentId.get("task-2")?.[0]?.title).toBe("发送邮件");
+  });
+
   it("restores a task and its direct subtasks", async () => {
     select.mockResolvedValueOnce([taskRow]);
     execute.mockResolvedValueOnce({ rowsAffected: 2 });

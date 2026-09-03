@@ -5,6 +5,7 @@ import {
   type PointerEvent,
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -263,6 +264,54 @@ function TagSuggestionMenu({
   );
 }
 
+function InlineSubtaskDisclosure({
+  isExpanded,
+  onComplete,
+  onToggle,
+  parentTask,
+  subtasks,
+}: {
+  isExpanded: boolean;
+  onComplete: (subtask: TaskRecord) => void;
+  onToggle: () => void;
+  parentTask: TaskRecord;
+  subtasks: TaskRecord[];
+}) {
+  if (subtasks.length === 0) return null;
+
+  const subtaskListId = `task-subtasks-${parentTask.id}`;
+
+  return (
+    <>
+      <button
+        aria-controls={subtaskListId}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? "收起" : "展开"}「${parentTask.title}」的 ${subtasks.length} 项子任务`}
+        className="inline-subtask-disclosure"
+        onClick={onToggle}
+        type="button"
+      >
+        <span aria-hidden="true" />
+      </button>
+      {isExpanded ? (
+        <ul className="task-row-subtasks" id={subtaskListId}>
+          {subtasks.map((subtask) => (
+            <li key={subtask.id}>
+              <button
+                aria-label={`完成子任务：${subtask.title}`}
+                className="task-complete-button"
+                onClick={() => onComplete(subtask)}
+                type="button"
+              />
+              <span>{subtask.title}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
 function formatUpcomingDate(localDate: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "long",
@@ -334,6 +383,10 @@ function MainApp() {
   const [selectedTaskRecurrence, setSelectedTaskRecurrence] = useState<RecurrenceRule | null>(null);
   const [pendingTaskDeletion, setPendingTaskDeletion] = useState<TaskRecord | null>(null);
   const [subtasks, setSubtasks] = useState<TaskRecord[]>([]);
+  const [subtasksByParentId, setSubtasksByParentId] = useState<Map<string, TaskRecord[]>>(
+    new Map(),
+  );
+  const [expandedSubtaskParentIds, setExpandedSubtaskParentIds] = useState<Set<string>>(new Set());
   const [taskTags, setTaskTags] = useState<TagRecord[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
@@ -370,6 +423,31 @@ function MainApp() {
     isDailyReviewOpen ||
     calendarScheduleDraft,
   );
+  const visibleParentTaskIds = useMemo(() => {
+    const parentTasks = new Map<string, TaskRecord>();
+    [
+      ...tasks,
+      ...todayFocusTasks,
+      ...todayCarryoverSuggestions,
+      ...todayScheduledTasks,
+      ...todayOverdueTasks,
+      ...todayCandidateTasks,
+      ...upcomingTasks,
+      ...calendarTasks,
+    ].forEach((task) => {
+      if (!task.parentTaskId) parentTasks.set(task.id, task);
+    });
+    return [...parentTasks.keys()];
+  }, [
+    calendarTasks,
+    tasks,
+    todayCandidateTasks,
+    todayCarryoverSuggestions,
+    todayFocusTasks,
+    todayOverdueTasks,
+    todayScheduledTasks,
+    upcomingTasks,
+  ]);
 
   useEffect(() => {
     function keepFocusInOpenDialog(event: KeyboardEvent) {
@@ -391,6 +469,24 @@ function MainApp() {
       stopQuickAdd?.();
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (visibleParentTaskIds.length === 0) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    void taskService.listActiveSubtasksByParentIds(visibleParentTaskIds).then((nextSubtasks) => {
+      if (isMounted) setSubtasksByParentId(nextSubtasks);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [visibleParentTaskIds]);
 
   useEffect(() => {
     function rememberBackgroundFocus(event: FocusEvent) {
@@ -919,6 +1015,11 @@ function MainApp() {
     try {
       const subtask = await taskService.createSubtask(selectedTask.id, title);
       setSubtasks((currentSubtasks) => [...currentSubtasks, subtask]);
+      setSubtasksByParentId((currentSubtasks) => {
+        const nextSubtasks = new Map(currentSubtasks);
+        nextSubtasks.set(selectedTask.id, [...(nextSubtasks.get(selectedTask.id) ?? []), subtask]);
+        return nextSubtasks;
+      });
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "添加子任务失败，请重试。");
     } finally {
@@ -935,10 +1036,57 @@ function MainApp() {
       setSubtasks((currentSubtasks) =>
         currentSubtasks.filter((subtask) => subtask.id !== subtaskId),
       );
+      if (selectedTask) {
+        setSubtasksByParentId((currentSubtasks) => {
+          const nextSubtasks = new Map(currentSubtasks);
+          nextSubtasks.set(
+            selectedTask.id,
+            (nextSubtasks.get(selectedTask.id) ?? []).filter((subtask) => subtask.id !== subtaskId),
+          );
+          return nextSubtasks;
+        });
+      }
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "更新子任务失败，请重试。");
     } finally {
       setIsSavingSubtask(false);
+    }
+  }
+
+  function toggleInlineSubtasks(parentTaskId: string) {
+    setExpandedSubtaskParentIds((currentParentIds) => {
+      const nextParentIds = new Set(currentParentIds);
+      if (nextParentIds.has(parentTaskId)) {
+        nextParentIds.delete(parentTaskId);
+      } else {
+        nextParentIds.add(parentTaskId);
+      }
+      return nextParentIds;
+    });
+  }
+
+  async function handleCompleteInlineSubtask(parentTaskId: string, subtask: TaskRecord) {
+    setTaskError(null);
+
+    try {
+      await taskService.completeTask(subtask.id);
+      setSubtasksByParentId((currentSubtasks) => {
+        const nextSubtasks = new Map(currentSubtasks);
+        nextSubtasks.set(
+          parentTaskId,
+          (nextSubtasks.get(parentTaskId) ?? []).filter(
+            (currentSubtask) => currentSubtask.id !== subtask.id,
+          ),
+        );
+        return nextSubtasks;
+      });
+      if (selectedTask?.id === parentTaskId) {
+        setSubtasks((currentSubtasks) =>
+          currentSubtasks.filter((currentSubtask) => currentSubtask.id !== subtask.id),
+        );
+      }
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "完成子任务失败，请重试。");
     }
   }
 
@@ -2028,6 +2176,15 @@ function MainApp() {
                             ) : task.dueDate && task.dueDate < upcomingStartDate ? (
                               <span className="upcoming-task-chip is-due">已逾期</span>
                             ) : null}
+                            <InlineSubtaskDisclosure
+                              isExpanded={expandedSubtaskParentIds.has(task.id)}
+                              onComplete={(subtask) =>
+                                void handleCompleteInlineSubtask(task.id, subtask)
+                              }
+                              onToggle={() => toggleInlineSubtasks(task.id)}
+                              parentTask={task}
+                              subtasks={subtasksByParentId.get(task.id) ?? []}
+                            />
                           </li>
                         ))}
                     </ul>
@@ -2104,6 +2261,13 @@ function MainApp() {
                       >
                         移出
                       </button>
+                      <InlineSubtaskDisclosure
+                        isExpanded={expandedSubtaskParentIds.has(task.id)}
+                        onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
+                        onToggle={() => toggleInlineSubtasks(task.id)}
+                        parentTask={task}
+                        subtasks={subtasksByParentId.get(task.id) ?? []}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -2155,6 +2319,15 @@ function MainApp() {
                         >
                           设为重点
                         </button>
+                        <InlineSubtaskDisclosure
+                          isExpanded={expandedSubtaskParentIds.has(task.id)}
+                          onComplete={(subtask) =>
+                            void handleCompleteInlineSubtask(task.id, subtask)
+                          }
+                          onToggle={() => toggleInlineSubtasks(task.id)}
+                          parentTask={task}
+                          subtasks={subtasksByParentId.get(task.id) ?? []}
+                        />
                       </li>
                     ))}
                 </ul>
@@ -2206,6 +2379,15 @@ function MainApp() {
                         >
                           设为重点
                         </button>
+                        <InlineSubtaskDisclosure
+                          isExpanded={expandedSubtaskParentIds.has(task.id)}
+                          onComplete={(subtask) =>
+                            void handleCompleteInlineSubtask(task.id, subtask)
+                          }
+                          onToggle={() => toggleInlineSubtasks(task.id)}
+                          parentTask={task}
+                          subtasks={subtasksByParentId.get(task.id) ?? []}
+                        />
                       </li>
                     ))}
                 </ul>
@@ -2256,6 +2438,13 @@ function MainApp() {
                       >
                         设为重点
                       </button>
+                      <InlineSubtaskDisclosure
+                        isExpanded={expandedSubtaskParentIds.has(task.id)}
+                        onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
+                        onToggle={() => toggleInlineSubtasks(task.id)}
+                        parentTask={task}
+                        subtasks={subtasksByParentId.get(task.id) ?? []}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -2296,6 +2485,13 @@ function MainApp() {
                       >
                         设为重点
                       </button>
+                      <InlineSubtaskDisclosure
+                        isExpanded={expandedSubtaskParentIds.has(task.id)}
+                        onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
+                        onToggle={() => toggleInlineSubtasks(task.id)}
+                        parentTask={task}
+                        subtasks={subtasksByParentId.get(task.id) ?? []}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -3006,6 +3202,13 @@ function MainApp() {
                     >
                       删除
                     </button>
+                    <InlineSubtaskDisclosure
+                      isExpanded={expandedSubtaskParentIds.has(task.id)}
+                      onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
+                      onToggle={() => toggleInlineSubtasks(task.id)}
+                      parentTask={task}
+                      subtasks={subtasksByParentId.get(task.id) ?? []}
+                    />
                   </li>
                 ))}
               </ul>

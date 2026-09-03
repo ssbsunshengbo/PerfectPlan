@@ -589,7 +589,7 @@ export function TaskDetailDialog({
           </button>
         </div>
 
-        <form className="task-details-form" onSubmit={handleSubmit}>
+        <form className="task-details-form" id="task-details-form" onSubmit={handleSubmit}>
           <label className="task-title-field" htmlFor="task-detail-title">
             <span>任务标题</span>
             <input
@@ -791,20 +791,6 @@ export function TaskDetailDialog({
             ) : null}
           </TaskDetailSection>
           {visibleError ? <p className="form-error">{visibleError}</p> : null}
-
-          <div className="dialog-actions task-detail-actions">
-            <button
-              className="secondary-button"
-              disabled={isSaving}
-              onClick={onClose}
-              type="button"
-            >
-              取消
-            </button>
-            <button className="primary-button" disabled={isSaving} type="submit">
-              {isSaving ? "正在保存…" : "保存任务"}
-            </button>
-          </div>
         </form>
 
         <TaskDetailSection
@@ -883,6 +869,20 @@ export function TaskDetailDialog({
             </button>
           </form>
         </TaskDetailSection>
+
+        <div className="dialog-actions task-detail-actions">
+          <button className="secondary-button" disabled={isSaving} onClick={onClose} type="button">
+            取消
+          </button>
+          <button
+            className="primary-button"
+            disabled={isSaving}
+            form="task-details-form"
+            type="submit"
+          >
+            {isSaving ? "正在保存…" : "保存任务"}
+          </button>
+        </div>
       </section>
     </div>
   );

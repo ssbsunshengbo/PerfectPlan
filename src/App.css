@@ -665,6 +665,7 @@ h1 {
 .task-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   min-height: 64px;
   border-bottom: 1px solid var(--line);
@@ -751,6 +752,63 @@ h1 {
 .task-tag:hover {
   border-color: var(--tag-color);
   background: color-mix(in srgb, var(--tag-color) 20%, #fff);
+}
+.inline-subtask-disclosure {
+  display: grid;
+  width: 17px;
+  height: 24px;
+  flex: 0 0 auto;
+  order: -1;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--faint);
+}
+.inline-subtask-disclosure > span {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentcolor;
+  opacity: 0.72;
+  transition: transform 130ms ease;
+}
+.inline-subtask-disclosure:hover {
+  color: var(--accent-deep);
+}
+.inline-subtask-disclosure[aria-expanded="true"] > span {
+  transform: rotate(90deg);
+}
+.task-row-subtasks {
+  display: grid;
+  width: calc(100% - 38px);
+  flex: 0 0 calc(100% - 38px);
+  order: 10;
+  gap: 2px;
+  margin: 1px 0 2px 38px;
+  border-left: 1px solid var(--line);
+  padding: 2px 0 2px 13px;
+  list-style: none;
+}
+.task-row-subtasks li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 29px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.task-row-subtasks .task-complete-button {
+  width: 17px;
+  height: 17px;
+  border-color: #bcc3ca;
+}
+.today-task-row {
+  flex-wrap: wrap;
+}
+.today-task-row .task-row-subtasks {
+  margin-left: 31px;
 }
 .tag-input-wrap {
   position: relative;

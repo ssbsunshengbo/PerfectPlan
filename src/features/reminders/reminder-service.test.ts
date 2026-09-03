@@ -92,18 +92,19 @@ describe("reminderService", () => {
   });
 
   it("snoozes an active task by replacing its pending reminder", async () => {
+    const futureReminderAt = new Date(Date.now() + 60 * 60_000).toISOString();
     select.mockResolvedValueOnce([{ id: "task-1" }]).mockResolvedValueOnce([
       {
         created_at: "2026-09-01T00:00:00.000Z",
         id: "reminder-2",
-        remind_at: "2026-09-03T08:45:00.000Z",
+        remind_at: futureReminderAt,
         status: "pending",
         task_id: "task-1",
         updated_at: "2026-09-01T00:00:00.000Z",
       },
     ]);
 
-    const reminder = await reminderService.snoozeReminder("task-1", "2026-09-03T08:45:00.000Z");
+    const reminder = await reminderService.snoozeReminder("task-1", futureReminderAt);
 
     expect(reminder?.status).toBe("pending");
     expect(execute.mock.calls[0]?.[0]).toContain("status = 'dismissed'");
