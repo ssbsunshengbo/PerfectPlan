@@ -129,17 +129,6 @@ function localDateBounds(value: string): [string, string] {
   return [start.toISOString(), nextDay.toISOString()];
 }
 
-function requireDateRange(startDate: string, endDate: string): [string, string] {
-  const start = normalizeLocalDate(startDate, "开始日期");
-  const end = normalizeLocalDate(endDate, "结束日期");
-
-  if (!start || !end || start > end) {
-    throw new Error("日期范围无效");
-  }
-
-  return [start, end];
-}
-
 function normalizeScheduledStartAt(value: string | null | undefined): string | null {
   const normalizedValue = value?.trim() ?? "";
 
@@ -430,34 +419,6 @@ export const taskService = {
        WHERE status = 'active' AND parent_task_id IS NULL AND scheduled_date = $1
        ORDER BY priority DESC, sort_order ASC, created_at DESC`,
       [normalizeLocalDate(localDate, "计划日期")],
-    );
-
-    return rows.map(toTaskRecord);
-  },
-
-  async listUpcomingTasks(startDate: string, endDate: string): Promise<TaskRecord[]> {
-    const [start, end] = requireDateRange(startDate, endDate);
-    const database = await getDatabase();
-    const rows = await database.select<TaskRow[]>(
-      `SELECT ${taskSelectFields}
-       FROM tasks
-       WHERE status IN ('active', 'completed')
-         AND parent_task_id IS NULL
-         AND (
-           scheduled_date BETWEEN $1 AND $2
-           OR due_date BETWEEN $1 AND $2
-         )
-       ORDER BY
-         CASE
-           WHEN scheduled_date BETWEEN $1 AND $2 THEN scheduled_date
-           ELSE due_date
-       END ASC,
-         status = 'completed' ASC,
-         scheduled_start_at IS NULL ASC,
-         scheduled_start_at ASC,
-         priority DESC,
-         sort_order ASC`,
-      [start, end],
     );
 
     return rows.map(toTaskRecord);

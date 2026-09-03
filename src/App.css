@@ -349,11 +349,9 @@ h1 {
 .workspace-header h1,
 .today-intro h2,
 .task-list-heading h2,
-.upcoming-toolbar h2,
 .calendar-toolbar h2,
 .project-list h2,
-.calendar-candidates h3,
-.upcoming-group-heading h3 {
+.calendar-candidates h3 {
   font-family: inherit;
   letter-spacing: -0.035em;
 }
@@ -361,7 +359,6 @@ h1 {
 .primary-button,
 .secondary-button,
 .danger-button,
-.range-nav-button,
 .calendar-view-switcher,
 .calendar-view-switcher button,
 .compact-filter select,
@@ -370,8 +367,6 @@ h1 {
 .today-task-row,
 .project-row,
 .calendar-candidates,
-.upcoming-group,
-.upcoming-empty,
 .calendar-schedule-dialog {
   border-radius: 8px;
 }
@@ -391,10 +386,26 @@ h1 {
 .secondary-button:hover:not(:disabled) {
   background: var(--panel-soft);
 }
+.range-nav-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid #cbd8cf;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 22px;
+  line-height: 1;
+}
+.range-nav-button:hover {
+  border-color: #9ccbb4;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
 .task-row,
 .today-task-row,
 .project-row,
-.upcoming-group,
 .calendar-candidates,
 .calendar-schedule-dialog {
   box-shadow: none;
@@ -429,43 +440,6 @@ h1 {
 }
 .calendar-candidate-task:hover {
   background: #f3f6fd;
-}
-
-.upcoming-day {
-  width: 100%;
-  border-color: #e0e3e7;
-  background: #fff;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
-}
-.upcoming-day:hover {
-  border-color: #b7c8f4;
-  background: #f7f9ff;
-}
-.upcoming-day.is-today {
-  border-color: #cdd9f7;
-  background: #f6f8ff;
-}
-.upcoming-day.is-today span,
-.upcoming-day.is-today strong {
-  color: var(--accent-deep);
-}
-.upcoming-day.is-selected {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-.upcoming-day.is-selected span,
-.upcoming-day.is-selected strong,
-.upcoming-day.is-selected small {
-  color: #fff;
-}
-.upcoming-selected-empty {
-  margin: 0;
-  padding: 6px 18px 18px;
-  color: var(--muted);
-  font-size: 13px;
 }
 
 .project-summary-button {
@@ -1007,154 +981,6 @@ h1 {
 .quick-reschedule-menu button:focus-visible {
   background: var(--accent-soft);
   color: var(--accent-deep);
-}
-
-.upcoming-view {
-  display: grid;
-  width: min(100%, 920px);
-  gap: 16px;
-}
-.upcoming-toolbar {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 3px 4px 2px;
-}
-.upcoming-toolbar .eyebrow {
-  margin-bottom: 5px;
-}
-.upcoming-toolbar h2 {
-  margin: 0;
-  font-family: Georgia, "Songti SC", serif;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
-}
-.upcoming-range-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.range-nav-button {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: 1px solid #cbd8cf;
-  border-radius: 10px;
-  background: #fff;
-  color: var(--accent);
-  font-size: 22px;
-  line-height: 1;
-}
-.range-nav-button:hover {
-  border-color: #9ccbb4;
-  background: var(--accent-soft);
-  color: var(--accent-deep);
-}
-.upcoming-date-strip {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 7px;
-}
-.upcoming-day {
-  display: grid;
-  min-height: 80px;
-  align-content: center;
-  justify-items: center;
-  gap: 3px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgb(255 254 250 / 72%);
-  color: var(--faint);
-}
-.upcoming-day span,
-.upcoming-day small {
-  font-size: 10px;
-  font-weight: 680;
-}
-.upcoming-day strong {
-  color: var(--ink);
-  font-family: Georgia, "Songti SC", serif;
-  font-size: 20px;
-  font-weight: 600;
-}
-.upcoming-day small {
-  min-height: 12px;
-  color: var(--accent);
-}
-.upcoming-day.is-today {
-  border-color: #9ccbb4;
-  background: #eaf5ee;
-}
-.upcoming-day.is-today span,
-.upcoming-day.is-today strong {
-  color: var(--accent-deep);
-}
-.upcoming-groups {
-  display: grid;
-  gap: 10px;
-}
-.upcoming-group {
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgb(255 254 250 / 86%);
-  box-shadow: 0 8px 28px rgb(35 53 44 / 4%);
-}
-.upcoming-group.is-empty {
-  box-shadow: none;
-}
-.upcoming-group-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
-}
-.upcoming-group-heading h3 {
-  margin: 0;
-  font-family: Georgia, "Songti SC", serif;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-.upcoming-group-heading span {
-  color: var(--faint);
-  font-size: 11px;
-}
-.upcoming-group.is-empty .upcoming-group-heading {
-  padding-block: 11px;
-}
-.upcoming-group.is-empty .upcoming-group-heading h3 {
-  color: var(--muted);
-  font-size: 14px;
-}
-.upcoming-task-chip {
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  padding: 4px 8px;
-  color: var(--accent-deep);
-  font-size: 10px;
-  font-weight: 760;
-  white-space: nowrap;
-}
-.upcoming-task-chip.is-due {
-  background: #fff0e8;
-  color: #ad6639;
-}
-.upcoming-empty {
-  display: grid;
-  min-height: 245px;
-  align-content: center;
-  justify-items: center;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: rgb(255 254 250 / 80%);
-  padding: 34px;
-  text-align: center;
 }
 
 .calendar-view {
@@ -1826,30 +1652,6 @@ h1 {
   color: var(--faint);
   font-size: 10px;
 }
-.upcoming-empty > span {
-  display: grid;
-  width: 43px;
-  height: 43px;
-  place-items: center;
-  border-radius: 15px;
-  background: #e8f4ec;
-  color: var(--accent);
-  font-size: 19px;
-}
-.upcoming-empty h3 {
-  margin: 15px 0 6px;
-  font-family: Georgia, "Songti SC", serif;
-  font-size: 18px;
-  font-weight: 600;
-}
-.upcoming-empty p {
-  max-width: 430px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.65;
-}
-
 .today-view {
   display: grid;
   width: min(100%, 860px);
@@ -3306,10 +3108,6 @@ h1 {
   .workspace-header {
     align-items: flex-start;
   }
-  .upcoming-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
   .calendar-toolbar {
     align-items: flex-start;
     flex-direction: column;
@@ -3324,19 +3122,6 @@ h1 {
   .calendar-month-weekdays,
   .calendar-month-grid {
     min-width: 680px;
-  }
-  .upcoming-date-strip {
-    gap: 4px;
-  }
-  .upcoming-day {
-    min-height: 67px;
-    border-radius: 10px;
-  }
-  .upcoming-day strong {
-    font-size: 17px;
-  }
-  .upcoming-day small {
-    font-size: 9px;
   }
   h1 {
     font-size: 35px;

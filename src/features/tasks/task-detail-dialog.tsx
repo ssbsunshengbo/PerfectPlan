@@ -613,7 +613,7 @@ export function TaskDetailDialog({
                 setDraft((current) => ({ ...current, projectId: String(projectId) }))
               }
               options={[
-                { label: "收集箱", value: "" },
+                { label: "未归属项目", value: "" },
                 ...projects.map((project) => ({
                   disabled: project.status === "archived" && project.id !== draft.projectId,
                   label: project.status === "archived" ? `${project.name}（已归档）` : project.name,

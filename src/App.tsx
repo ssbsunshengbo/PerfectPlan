@@ -56,7 +56,7 @@ import type { RecurrenceRule, TaskPriority, TaskRecord } from "./features/tasks/
 
 type DatabaseState = "loading" | "ready" | "error";
 
-const navigationItems = ["今日", "收集箱", "即将到来", "日历", "项目", "标签", "回收站"] as const;
+const navigationItems = ["今日", "任务", "日历", "项目", "回收站"] as const;
 type NavigationItem = (typeof navigationItems)[number];
 type ReversibleTaskAction = {
   kind: "created" | "completed" | "rescheduled" | "trashed";
@@ -319,22 +319,6 @@ function InlineSubtaskDisclosure({
   );
 }
 
-function formatUpcomingDate(localDate: string): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(toLocalDate(localDate));
-}
-
-function formatUpcomingDay(localDate: string): { day: string; weekday: string } {
-  const date = toLocalDate(localDate);
-  const day = new Intl.DateTimeFormat("zh-CN", { day: "numeric" }).format(date);
-  const weekday = new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(date);
-
-  return { day, weekday };
-}
-
 function App() {
   const windowLabel = getCurrentWindow().label;
   if (windowLabel === "tray") return <TrayTodayPanel />;
@@ -348,7 +332,7 @@ function MainApp() {
   const [databaseAttempt, setDatabaseAttempt] = useState(0);
   const [isRetryingDatabase, setIsRetryingDatabase] = useState(false);
   const [isViewLoading, setIsViewLoading] = useState(false);
-  const [activeView, setActiveView] = useState<NavigationItem>("收集箱");
+  const [activeView, setActiveView] = useState<NavigationItem>("任务");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [taskTagsById, setTaskTagsById] = useState<Map<string, TagRecord[]>>(new Map());
@@ -361,9 +345,6 @@ function MainApp() {
   const [todayCompletedTasks, setTodayCompletedTasks] = useState<TaskRecord[]>([]);
   const [todayCandidateTasks, setTodayCandidateTasks] = useState<TaskRecord[]>([]);
   const [isCompletedTodayExpanded, setIsCompletedTodayExpanded] = useState(false);
-  const [upcomingStartDate, setUpcomingStartDate] = useState(() => toLocalDateValue());
-  const [selectedUpcomingDate, setSelectedUpcomingDate] = useState(() => toLocalDateValue());
-  const [upcomingTasks, setUpcomingTasks] = useState<TaskRecord[]>([]);
   const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>("week");
   const [calendarAnchorDate, setCalendarAnchorDate] = useState(() => toLocalDateValue());
   const [calendarTasks, setCalendarTasks] = useState<TaskRecord[]>([]);
@@ -439,7 +420,6 @@ function MainApp() {
       ...todayScheduledTasks,
       ...todayOverdueTasks,
       ...todayCandidateTasks,
-      ...upcomingTasks,
       ...calendarTasks,
     ].forEach((task) => {
       if (!task.parentTaskId) parentTasks.set(task.id, task);
@@ -453,7 +433,6 @@ function MainApp() {
     todayFocusTasks,
     todayOverdueTasks,
     todayScheduledTasks,
-    upcomingTasks,
   ]);
 
   useEffect(() => {
@@ -576,7 +555,7 @@ function MainApp() {
 
       if (event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setActiveView("收集箱");
+        setActiveView("任务");
         window.requestAnimationFrame(() => searchInputRef.current?.focus());
       }
     }
@@ -693,13 +672,6 @@ function MainApp() {
     setTodayCandidateTasks(candidateTasks);
   }
 
-  async function loadUpcomingTasks(startDate = upcomingStartDate) {
-    const endDate = addDays(startDate, 6);
-    const upcoming = await taskService.listUpcomingTasks(startDate, endDate);
-
-    setUpcomingTasks(upcoming);
-  }
-
   async function loadCalendarTasks() {
     const today = toLocalDateValue();
     const [calendarTasks, focusTasks, overdueTasks] = await Promise.all([
@@ -782,7 +754,6 @@ function MainApp() {
         task: { id: task.id, title: task.title },
       });
       if (activeView === "今日") await loadTodayTasks();
-      if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
       return true;
     } catch (error) {
@@ -877,7 +848,6 @@ function MainApp() {
       });
       await loadInboxTasks();
       if (activeView === "今日") await loadTodayTasks();
-      if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "改期失败，请重试。");
@@ -977,7 +947,6 @@ function MainApp() {
       setSelectedTask(null);
       setSelectedTaskReminder(null);
       if (activeView === "今日") await loadTodayTasks();
-      if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "保存任务失败，请重试。");
@@ -1189,7 +1158,6 @@ function MainApp() {
       setSelectedTask(null);
       setPendingTaskDeletion(null);
       if (activeView === "今日") await loadTodayTasks();
-      if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "删除任务失败，请重试。");
@@ -1204,9 +1172,8 @@ function MainApp() {
       setTrashedTasks((currentTasks) =>
         currentTasks.filter((currentTask) => currentTask.id !== task.id),
       );
-      if (activeView === "收集箱") await loadInboxTasks();
+      if (activeView === "任务") await loadInboxTasks();
       if (activeView === "今日") await loadTodayTasks();
-      if (activeView === "即将到来") await loadUpcomingTasks();
       if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "恢复任务失败，请重试。");
@@ -1230,7 +1197,6 @@ function MainApp() {
         await taskService.updateTask(lastTaskAction.task.id, lastTaskAction.previousSchedule);
         await loadInboxTasks();
         if (activeView === "今日") await loadTodayTasks();
-        if (activeView === "即将到来") await loadUpcomingTasks();
         if (activeView === "日历") await loadCalendarTasks();
       } else {
         if (lastTaskAction.kind === "completed" && lastTaskAction.nextRecurringTaskId) {
@@ -1261,46 +1227,13 @@ function MainApp() {
     setIsViewLoading(true);
 
     try {
-      if (item === "收集箱") await loadInboxTasks();
+      if (item === "任务") await loadInboxTasks();
       if (item === "今日") await loadTodayTasks();
-      if (item === "即将到来") await loadUpcomingTasks();
       if (item === "日历") await loadCalendarTasks();
-      if (item === "项目" || item === "标签") await loadTaskCatalog();
+      if (item === "项目") await loadTaskCatalog();
       if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
-    } finally {
-      setIsViewLoading(false);
-    }
-  }
-
-  async function handleUpcomingRangeChange(days: number) {
-    const nextStartDate = addDays(upcomingStartDate, days);
-    setUpcomingStartDate(nextStartDate);
-    setSelectedUpcomingDate(nextStartDate);
-    setTaskError(null);
-    setIsViewLoading(true);
-
-    try {
-      await loadUpcomingTasks(nextStartDate);
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "无法读取即将到来的任务，请重试。");
-    } finally {
-      setIsViewLoading(false);
-    }
-  }
-
-  async function handleUpcomingReset() {
-    const today = toLocalDateValue();
-    setUpcomingStartDate(today);
-    setSelectedUpcomingDate(today);
-    setTaskError(null);
-    setIsViewLoading(true);
-
-    try {
-      await loadUpcomingTasks(today);
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "无法读取即将到来的任务，请重试。");
     } finally {
       setIsViewLoading(false);
     }
@@ -1526,29 +1459,12 @@ function MainApp() {
     setSearchInputValue("");
     setPriorityFilter("all");
     setProjectFilter(projectId);
-    setActiveView("收集箱");
+    setActiveView("任务");
     setIsViewLoading(true);
     try {
       await loadInboxTasks(null, "", projectId, "all");
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取项目任务，请重试。");
-    } finally {
-      setIsViewLoading(false);
-    }
-  }
-
-  async function handleOpenTagTasks(tagId: string) {
-    setActiveTagId(tagId);
-    setSearchQuery("");
-    setSearchInputValue("");
-    setPriorityFilter("all");
-    setProjectFilter("all");
-    setActiveView("收集箱");
-    setIsViewLoading(true);
-    try {
-      await loadInboxTasks(tagId, "", "all", "all");
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "无法读取标签任务，请重试。");
     } finally {
       setIsViewLoading(false);
     }
@@ -1770,47 +1686,10 @@ function MainApp() {
     }
   }
 
-  async function handleDeleteTag(tag: TagRecord) {
-    const shouldDelete = window.confirm(
-      `删除标签「${tag.name}」？任务会保留，只会解除与该标签的关联。`,
-    );
-    if (!shouldDelete) return;
-
-    setTaskError(null);
-    setIsSavingTag(true);
-
-    try {
-      await tagService.deleteTag(tag.id);
-      setTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
-      setTaskTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
-      setTaskTagsById((currentTaskTags) => {
-        const nextTaskTags = new Map<string, TagRecord[]>();
-        currentTaskTags.forEach((attachedTags, taskId) => {
-          nextTaskTags.set(
-            taskId,
-            attachedTags.filter((attachedTag) => attachedTag.id !== tag.id),
-          );
-        });
-        return nextTaskTags;
-      });
-
-      if (activeTagId === tag.id) {
-        setActiveTagId(null);
-        await loadInboxTasks(null);
-      }
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "删除标签失败，请重试。");
-    } finally {
-      setIsSavingTag(false);
-    }
-  }
-
   const isToday = activeView === "今日";
-  const isInbox = activeView === "收集箱";
-  const isUpcoming = activeView === "即将到来";
+  const isInbox = activeView === "任务";
   const isCalendar = activeView === "日历";
   const isProjects = activeView === "项目";
-  const isTags = activeView === "标签";
   const isTrash = activeView === "回收站";
   const hasInboxFilters = Boolean(
     activeTagId || searchQuery || projectFilter !== "all" || priorityFilter !== "all",
@@ -1827,17 +1706,6 @@ function MainApp() {
     });
     return stats;
   }, [tasks]);
-  const taskStatsByTagId = useMemo(() => {
-    const stats = new Map<string, { active: number; completed: number }>();
-    tasks.forEach((task) => {
-      (taskTagsById.get(task.id) ?? []).forEach((tag) => {
-        const current = stats.get(tag.id) ?? { active: 0, completed: 0 };
-        current[task.status === "completed" ? "completed" : "active"] += 1;
-        stats.set(tag.id, current);
-      });
-    });
-    return stats;
-  }, [taskTagsById, tasks]);
   const todayFocusTaskIds = new Set(todayFocusTasks.map((task) => task.id));
   const todayOtherTaskIds = new Set([
     ...todayCarryoverSuggestions.map((task) => task.id),
@@ -1848,8 +1716,6 @@ function MainApp() {
     (task) => !todayFocusTaskIds.has(task.id) && !todayOtherTaskIds.has(task.id),
   );
   const todayLabel = formatTodayLabel(toLocalDateValue());
-  const upcomingEndDate = addDays(upcomingStartDate, 6);
-  const upcomingDates = Array.from({ length: 7 }, (_, index) => addDays(upcomingStartDate, index));
   const calendarWeekStart = startOfWeek(calendarAnchorDate);
   const calendarMonthStart = (() => {
     const date = toLocalDate(calendarAnchorDate);
@@ -1938,20 +1804,6 @@ function MainApp() {
       : null;
   const calendarBoardMinWidth = calendarViewMode === "week" ? 670 : 360;
 
-  function upcomingDisplayDate(task: TaskRecord): string | null {
-    if (
-      task.scheduledDate &&
-      task.scheduledDate >= upcomingStartDate &&
-      task.scheduledDate <= upcomingEndDate
-    ) {
-      return task.scheduledDate;
-    }
-
-    return task.dueDate && task.dueDate >= upcomingStartDate && task.dueDate <= upcomingEndDate
-      ? task.dueDate
-      : null;
-  }
-
   function calendarTaskColor(task: TaskRecord): string {
     return projects.find((project) => project.id === task.projectId)?.color ?? "#8bad99";
   }
@@ -2016,7 +1868,7 @@ function MainApp() {
           className="command-button"
           disabled={databaseState !== "ready"}
           onClick={() => {
-            setActiveView("收集箱");
+            setActiveView("任务");
             window.requestAnimationFrame(() => searchInputRef.current?.focus());
           }}
           type="button"
@@ -2032,15 +1884,7 @@ function MainApp() {
         <header className="workspace-header">
           <div>
             <p className="eyebrow">{activeView}</p>
-            <h1>
-              {isToday
-                ? "今天，专注少数要事"
-                : isUpcoming
-                  ? "下一步，提前看见"
-                  : isInbox
-                    ? "先记下，稍后再安排"
-                    : activeView}
-            </h1>
+            <h1>{isToday ? "今天，专注少数要事" : isInbox ? "所有任务，一处找回" : activeView}</h1>
           </div>
           <button
             aria-keyshortcuts="Control+N Meta+N"
@@ -2099,174 +1943,6 @@ function MainApp() {
               <h2>正在更新{activeView}</h2>
               <p>请稍候，数据仍保留在本机。</p>
             </div>
-          </section>
-        ) : isUpcoming ? (
-          <section aria-labelledby="upcoming-view-title" className="upcoming-view">
-            <div className="upcoming-toolbar">
-              <div>
-                <p className="eyebrow">日期浏览</p>
-                <h2 id="upcoming-view-title">
-                  {formatUpcomingDate(upcomingStartDate)} — {formatUpcomingDate(upcomingEndDate)}
-                </h2>
-              </div>
-              <div aria-label="切换日期范围" className="upcoming-range-actions">
-                <button
-                  aria-label="查看前 7 天"
-                  className="range-nav-button"
-                  onClick={() => void handleUpcomingRangeChange(-7)}
-                  type="button"
-                >
-                  ‹
-                </button>
-                <button
-                  className="secondary-button"
-                  onClick={() => void handleUpcomingReset()}
-                  type="button"
-                >
-                  回到今天
-                </button>
-                <button
-                  aria-label="查看后 7 天"
-                  className="range-nav-button"
-                  onClick={() => void handleUpcomingRangeChange(7)}
-                  type="button"
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-
-            <div aria-label="当前七天" className="upcoming-date-strip">
-              {upcomingDates.map((date) => {
-                const { day, weekday } = formatUpcomingDay(date);
-                const taskCount = upcomingTasks.filter(
-                  (task) => upcomingDisplayDate(task) === date,
-                ).length;
-                const isTodayDate = date === toLocalDateValue();
-
-                return (
-                  <button
-                    aria-pressed={date === selectedUpcomingDate}
-                    className={[
-                      "upcoming-day",
-                      isTodayDate ? "is-today" : "",
-                      date === selectedUpcomingDate ? "is-selected" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    key={date}
-                    onClick={() => setSelectedUpcomingDate(date)}
-                    type="button"
-                  >
-                    <span>{weekday}</span>
-                    <strong>{day}</strong>
-                    <small>{taskCount > 0 ? `${taskCount} 项` : ""}</small>
-                  </button>
-                );
-              })}
-            </div>
-
-            {upcomingTasks.length === 0 ? (
-              <div className="upcoming-empty">
-                <span aria-hidden="true">✦</span>
-                <h3>这七天还没有已计划或临近截止的任务</h3>
-                <p>你可以在任务详情中设置计划日期或截止日期，它们会自动出现在这里。</p>
-              </div>
-            ) : (
-              <div className="upcoming-groups">
-                <section
-                  aria-labelledby={`upcoming-${selectedUpcomingDate}`}
-                  className={
-                    upcomingTasks.some((task) => upcomingDisplayDate(task) === selectedUpcomingDate)
-                      ? "upcoming-group"
-                      : "upcoming-group is-empty"
-                  }
-                >
-                  <div className="upcoming-group-heading">
-                    <h3 id={`upcoming-${selectedUpcomingDate}`}>
-                      {formatUpcomingDate(selectedUpcomingDate)}
-                    </h3>
-                    <span>
-                      {upcomingTasks.filter(
-                        (task) => upcomingDisplayDate(task) === selectedUpcomingDate,
-                      ).length || "暂未安排"}
-                    </span>
-                  </div>
-                  {upcomingTasks.filter(
-                    (task) => upcomingDisplayDate(task) === selectedUpcomingDate,
-                  ).length > 0 ? (
-                    <ul className="today-task-list">
-                      {upcomingTasks
-                        .filter((task) => upcomingDisplayDate(task) === selectedUpcomingDate)
-                        .map((task) => {
-                          const isCompleted = task.status === "completed";
-
-                          return (
-                            <li
-                              className={
-                                isCompleted ? "today-task-row is-completed" : "today-task-row"
-                              }
-                              key={task.id}
-                            >
-                              <button
-                                aria-label={`${isCompleted ? "已完成" : "完成"}任务：${task.title}`}
-                                className={
-                                  isCompleted
-                                    ? "task-complete-button is-completed"
-                                    : "task-complete-button"
-                                }
-                                disabled={isCompleted}
-                                onClick={() => void handleCompleteTask(task)}
-                                type="button"
-                              />
-                              <button
-                                className="task-title"
-                                onClick={() => void openTaskDetails(task)}
-                                type="button"
-                              >
-                                {task.title}
-                              </button>
-                              {!isCompleted ? (
-                                <QuickRescheduleButton
-                                  onReschedule={(selectedTask, target) =>
-                                    void handleQuickReschedule(selectedTask, target)
-                                  }
-                                  task={task}
-                                />
-                              ) : null}
-                              {task.scheduledDate === selectedUpcomingDate ? (
-                                <span className="upcoming-task-chip">计划</span>
-                              ) : null}
-                              {task.dueDate === selectedUpcomingDate ? (
-                                <span className="upcoming-task-chip is-due">截止</span>
-                              ) : task.dueDate &&
-                                task.dueDate >= upcomingStartDate &&
-                                task.dueDate <= upcomingEndDate ? (
-                                <span className="upcoming-task-chip">
-                                  截止 {task.dueDate.slice(5)}
-                                </span>
-                              ) : task.dueDate && task.dueDate < upcomingStartDate ? (
-                                <span className="upcoming-task-chip is-due">已逾期</span>
-                              ) : null}
-                              <InlineSubtaskDisclosure
-                                isExpanded={expandedSubtaskParentIds.has(task.id)}
-                                onComplete={(subtask) =>
-                                  void handleCompleteInlineSubtask(task.id, subtask)
-                                }
-                                onToggle={() => toggleInlineSubtasks(task.id)}
-                                parentTask={task}
-                                subtasks={subtasksByParentId.get(task.id) ?? []}
-                              />
-                            </li>
-                          );
-                        })}
-                    </ul>
-                  ) : (
-                    <p className="upcoming-selected-empty">这天没有已计划或临近截止的任务。</p>
-                  )}
-                </section>
-              </div>
-            )}
           </section>
         ) : isToday ? (
           <section aria-labelledby="today-view-title" className="today-view">
@@ -2532,7 +2208,7 @@ function MainApp() {
                 <div className="today-section-header">
                   <div>
                     <p className="eyebrow">可选任务</p>
-                    <h3 id="today-candidates-title">从收集箱里挑选</h3>
+                    <h3 id="today-candidates-title">从任务里挑选</h3>
                   </div>
                 </div>
                 <ul className="today-task-list">
@@ -3081,7 +2757,7 @@ function MainApp() {
                   <div className="calendar-candidates-empty">
                     <span aria-hidden="true">✦</span>
                     <strong>暂时没有待安排任务</strong>
-                    <p>收集箱与今日重点会显示在这里。</p>
+                    <p>未安排的任务与今日重点会显示在这里。</p>
                   </div>
                 )}
               </aside>
@@ -3156,7 +2832,7 @@ function MainApp() {
                   value={projectFilter}
                 >
                   <option value="all">全部项目</option>
-                  <option value="">收集箱</option>
+                  <option value="">未归属项目</option>
                   {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.status === "archived" ? `${project.name}（已归档）` : project.name}
@@ -3412,62 +3088,6 @@ function MainApp() {
               </div>
             ) : null}
           </section>
-        ) : isTags ? (
-          <section className="project-list" aria-labelledby="tag-management-title">
-            <div className="task-list-heading">
-              <div>
-                <h2 id="tag-management-title">标签</h2>
-                <p>跨项目整理任务；标签可在任务详情中创建。</p>
-              </div>
-            </div>
-            {tags.length > 0 ? (
-              <ul>
-                {tags.map((tag) => {
-                  const taskStats = taskStatsByTagId.get(tag.id) ?? { active: 0, completed: 0 };
-
-                  return (
-                    <li className="project-row" key={tag.id}>
-                      <span
-                        aria-hidden="true"
-                        className="tag-color"
-                        style={{ background: getDisplayTagColor(tag) }}
-                      />
-                      <button
-                        aria-label={`查看标签「${tag.name}」下的所有任务`}
-                        className="project-summary project-summary-button"
-                        onClick={() => void handleOpenTagTasks(tag.id)}
-                        type="button"
-                      >
-                        <strong>{tag.name}</strong>
-                        <span>
-                          {taskStats.active} 待办 · {taskStats.completed} 已完成
-                        </span>
-                      </button>
-                      <div className="project-actions">
-                        <button
-                          className="secondary-button"
-                          onClick={() => void handleOpenTagTasks(tag.id)}
-                          type="button"
-                        >
-                          查看任务
-                        </button>
-                        <button
-                          className="danger-button"
-                          disabled={isSavingTag}
-                          onClick={() => void handleDeleteTag(tag)}
-                          type="button"
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="project-empty">还没有标签。可在任务详情中创建并添加标签。</p>
-            )}
-          </section>
         ) : isTrash ? (
           <section className="project-list" aria-labelledby="trash-title">
             <div className="task-list-heading">
@@ -3504,7 +3124,7 @@ function MainApp() {
               ···
             </span>
             <h2 id="future-view-title">{activeView}正在准备中</h2>
-            <p>先把想做的事放进收集箱。每日规划、日历和项目将在后续阶段接入。</p>
+            <p>先记录一项任务，再决定今天或日历中的安排。</p>
           </section>
         )}
 
@@ -3640,7 +3260,7 @@ function MainApp() {
           >
             <div className="quick-add-header">
               <div>
-                <p className="eyebrow">收集箱</p>
+                <p className="eyebrow">任务</p>
                 <h2 id="quick-add-title">添加任务</h2>
               </div>
               <button
