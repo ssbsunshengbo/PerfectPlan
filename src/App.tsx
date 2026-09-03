@@ -1630,6 +1630,15 @@ function MainApp() {
     });
   const calendarHours = Array.from({ length: 18 }, (_, index) => index + 6);
   const calendarHalfHourSlots = Array.from({ length: 36 }, (_, index) => 6 * 60 + index * 30);
+  const calendarTimeDropDuration =
+    calendarDragPreview?.dropKind === "time" && calendarDragPreview.dropStartMinutes !== null
+      ? snapCalendarDuration(
+          calendarDragPreview.dropStartMinutes,
+          calendarDragPreview.task.scheduledStartAt
+            ? (calendarDragPreview.task.estimatedMinutes ?? 60)
+            : 60,
+        )
+      : null;
   const calendarBoardMinWidth = calendarViewMode === "week" ? 670 : 360;
 
   function upcomingDisplayDate(task: TaskRecord): string | null {
@@ -2517,6 +2526,17 @@ function MainApp() {
                     >
                       {calendarDates.map((date) => {
                         const timedTasks = calendarTimedTasksByDate.get(date) ?? [];
+                        const timeDropPreview =
+                          calendarDragPreview?.dropDate === date &&
+                          calendarDragPreview.dropKind === "time" &&
+                          calendarDragPreview.dropStartMinutes !== null &&
+                          calendarTimeDropDuration !== null
+                            ? {
+                                duration: calendarTimeDropDuration,
+                                startMinutes: calendarDragPreview.dropStartMinutes,
+                                task: calendarDragPreview.task,
+                              }
+                            : null;
 
                         return (
                           <div
@@ -2546,6 +2566,21 @@ function MainApp() {
                                 style={{ top: `${startMinutes - 6 * 60}px` }}
                               />
                             ))}
+                            {timeDropPreview ? (
+                              <div
+                                aria-hidden="true"
+                                className="calendar-time-drop-shadow"
+                                style={
+                                  {
+                                    "--task-color": calendarTaskColor(timeDropPreview.task),
+                                    height: `${timeDropPreview.duration}px`,
+                                    top: `${timeDropPreview.startMinutes - 6 * 60}px`,
+                                  } as CSSProperties
+                                }
+                              >
+                                <span>{`${toTimeValue(timeDropPreview.startMinutes)} · ${timeDropPreview.duration} 分钟`}</span>
+                              </div>
+                            ) : null}
                             {timedTasks.map((task) => {
                               const estimatedMinutes = task.estimatedMinutes ?? 30;
                               const offsetMinutes = calendarTimeOffset(task.scheduledStartAt);
@@ -2574,6 +2609,7 @@ function MainApp() {
                                     isConflict ? "is-conflict" : "",
                                     hasTimezoneMismatch ? "has-timezone-mismatch" : "",
                                     isOutsideGrid ? "is-outside-grid" : "",
+                                    calendarDragPreview?.task.id === task.id ? "is-dragging" : "",
                                   ]
                                     .filter(Boolean)
                                     .join(" ")}

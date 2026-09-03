@@ -1251,6 +1251,30 @@ h1 {
   background: rgb(43 115 89 / 13%);
   box-shadow: inset 0 0 0 2px rgb(43 115 89 / 54%);
 }
+.calendar-time-drop-shadow {
+  position: absolute;
+  z-index: 4;
+  right: 5px;
+  left: 5px;
+  min-height: 30px;
+  overflow: hidden;
+  border: 1px dashed color-mix(in srgb, var(--task-color) 76%, #fff);
+  border-left: 3px solid var(--task-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--task-color) 22%, transparent);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 48%);
+  color: var(--ink);
+  pointer-events: none;
+}
+.calendar-time-drop-shadow span {
+  display: inline-block;
+  margin: 5px 6px;
+  border-radius: 999px;
+  background: rgb(255 254 250 / 82%);
+  padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 780;
+}
 .calendar-time-task {
   position: absolute;
   z-index: 2;
@@ -1268,6 +1292,11 @@ h1 {
   z-index: 2;
   border-color: var(--task-color);
   background: color-mix(in srgb, var(--task-color) 22%, var(--panel));
+}
+.calendar-time-task.is-dragging {
+  z-index: 1;
+  opacity: 0.24;
+  pointer-events: none;
 }
 .calendar-time-task.is-after-due {
   border-top-color: #d7a75a;
