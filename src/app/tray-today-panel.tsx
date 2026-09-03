@@ -5,6 +5,14 @@ import { dailyPlanService } from "../features/daily-plan/daily-plan-service";
 import { taskService } from "../features/tasks/task-service";
 import { projectService } from "../features/projects/project-service";
 import type { ProjectRecord } from "../features/projects/project-types";
+import {
+  getDisplayTagColor,
+  getTagSuggestions,
+  insertTagToken,
+  parseTaskTagTokens,
+} from "../features/tags/tag-input";
+import { tagService } from "../features/tags/tag-service";
+import type { TagRecord } from "../features/tags/tag-types";
 import type { TaskRecord } from "../features/tasks/task-types";
 
 function localDate() {
@@ -17,6 +25,7 @@ function localDate() {
 export function TrayTodayPanel() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [projectsById, setProjectsById] = useState<Map<string, ProjectRecord>>(new Map());
+  const [tags, setTags] = useState<TagRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -27,11 +36,12 @@ export function TrayTodayPanel() {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [focus, scheduled, overdue, projects] = await Promise.all([
+      const [focus, scheduled, overdue, projects, availableTags] = await Promise.all([
         dailyPlanService.listFocusTasks(today),
         taskService.listActiveTasksScheduledOn(today),
         taskService.listOverdueActiveTasks(today),
         projectService.listActiveProjects(),
+        tagService.listTags(),
       ]);
       const seen = new Set<string>();
       setTasks(
@@ -40,6 +50,7 @@ export function TrayTodayPanel() {
         ),
       );
       setProjectsById(new Map(projects.map((project) => [project.id, project])));
+      setTags(availableTags);
     } finally {
       setIsLoading(false);
     }
@@ -101,13 +112,14 @@ export function TrayTodayPanel() {
 
   async function createTodayTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const title = newTaskTitle.trim();
+    const { tagIds, title } = parseTaskTagTokens(newTaskTitle, tags);
     if (!title) return;
 
     setIsCreating(true);
     setError(null);
     try {
       const task = await taskService.createTask({ title });
+      await Promise.all(tagIds.map((tagId) => tagService.attachTagToTask(task.id, tagId)));
       await taskService.updateTask(task.id, { scheduledDate: today });
       setNewTaskTitle("");
       await load();
@@ -144,13 +156,33 @@ export function TrayTodayPanel() {
       </header>
       <form className="tray-quick-add" onSubmit={(event) => void createTodayTask(event)}>
         <span aria-hidden="true">＋</span>
-        <input
-          aria-label="添加到今天的任务"
-          disabled={isCreating}
-          onChange={(event) => setNewTaskTitle(event.target.value)}
-          placeholder="添加任务"
-          value={newTaskTitle}
-        />
+        <div className="tray-tag-input-wrap">
+          <input
+            aria-label="添加到今天的任务"
+            disabled={isCreating}
+            onChange={(event) => setNewTaskTitle(event.target.value)}
+            placeholder="添加任务 #标签"
+            value={newTaskTitle}
+          />
+          {getTagSuggestions(newTaskTitle, tags).length > 0 ? (
+            <div aria-label="选择标签" className="tray-tag-suggestion-menu" role="listbox">
+              {getTagSuggestions(newTaskTitle, tags).map((tag) => (
+                <button
+                  key={tag.id}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() =>
+                    setNewTaskTitle((currentTitle) => insertTagToken(currentTitle, tag))
+                  }
+                  role="option"
+                  style={{ "--tag-color": getDisplayTagColor(tag) } as React.CSSProperties}
+                  type="button"
+                >
+                  <i aria-hidden="true" />#{tag.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </form>
       <div className="tray-section-heading">
         <span>待完成</span>

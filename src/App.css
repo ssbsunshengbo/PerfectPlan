@@ -646,6 +646,16 @@ h1 {
   color: var(--accent-deep);
   font-weight: 760;
 }
+.tag-chip[style] {
+  border-color: color-mix(in srgb, var(--tag-color) 38%, #d7ded9);
+  background: color-mix(in srgb, var(--tag-color) 10%, #fff);
+  color: color-mix(in srgb, var(--tag-color) 74%, #26352d);
+}
+.tag-chip[style].is-selected {
+  border-color: var(--tag-color);
+  background: color-mix(in srgb, var(--tag-color) 19%, #fff);
+  color: color-mix(in srgb, var(--tag-color) 88%, #1d2b22);
+}
 .task-list ul,
 .project-list ul {
   margin: 0;
@@ -707,6 +717,84 @@ h1 {
 }
 .task-title:hover {
   color: var(--accent-deep);
+}
+.task-row-tags {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  gap: 5px;
+}
+.task-tag {
+  max-width: 96px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag-color) 12%, #fff);
+  padding: 3px 7px;
+  color: color-mix(in srgb, var(--tag-color) 82%, #253229);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 720;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-tag:hover {
+  border-color: var(--tag-color);
+  background: color-mix(in srgb, var(--tag-color) 20%, #fff);
+}
+.tag-input-wrap {
+  position: relative;
+}
+.tag-suggestion-menu,
+.tray-tag-suggestion-menu {
+  position: absolute;
+  z-index: 8;
+  display: grid;
+  min-width: 180px;
+  max-width: min(100%, 260px);
+  gap: 3px;
+  border: 1px solid #d9e1db;
+  border-radius: 10px;
+  background: #fffefb;
+  box-shadow: 0 10px 24px rgb(35 53 44 / 15%);
+  padding: 6px;
+}
+.tag-suggestion-menu {
+  top: calc(100% + 5px);
+  left: 0;
+}
+.tag-suggestion-menu > span {
+  padding: 2px 6px 4px;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 720;
+}
+.tag-suggestion-menu button,
+.tray-tag-suggestion-menu button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 6px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+.tag-suggestion-menu button:hover,
+.tray-tag-suggestion-menu button:hover {
+  background: color-mix(in srgb, var(--tag-color) 13%, #f7faf8);
+}
+.tag-suggestion-menu i,
+.tray-tag-suggestion-menu i {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--tag-color);
 }
 .task-delete-button {
   margin-left: auto;
@@ -3192,6 +3280,17 @@ body:has(.tray-today-panel) #root {
   background: transparent;
   color: #30343b;
   font-size: 15px;
+}
+.tray-tag-input-wrap {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+.tray-tag-suggestion-menu {
+  top: calc(100% + 8px);
+  right: 0;
+  left: 0;
+  min-width: 0;
 }
 .tray-quick-add input::placeholder {
   color: #b4b6bb;

@@ -40,6 +40,24 @@ describe("tagService", () => {
     expect(execute.mock.calls[0]?.[0]).toContain("INSERT OR IGNORE");
   });
 
+  it("loads tag mappings for multiple task rows in one query", async () => {
+    select.mockResolvedValueOnce([
+      {
+        color: "#537fd9",
+        created_at: "2026-09-01T00:00:00.000Z",
+        id: "tag-1",
+        name: "调研",
+        task_id: "task-1",
+        updated_at: "2026-09-01T00:00:00.000Z",
+      },
+    ]);
+
+    const tagsByTaskId = await tagService.listTaskTagsByTaskIds(["task-1", "task-2"]);
+
+    expect(tagsByTaskId.get("task-1")?.map((tag) => tag.name)).toEqual(["调研"]);
+    expect(select.mock.calls[0]?.[0]).toContain("task_tags.task_id IN ($1, $2)");
+  });
+
   it("deletes a tag record without touching its tasks", async () => {
     await tagService.deleteTag("tag-1");
 

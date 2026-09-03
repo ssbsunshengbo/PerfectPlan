@@ -8,6 +8,7 @@ type TagRow = {
   name: string;
   updated_at: string;
 };
+type TaskTagRow = TagRow & { task_id: string };
 
 function toTagRecord(row: TagRow): TagRecord {
   return {
@@ -90,6 +91,28 @@ export const tagService = {
     );
 
     return rows.map(toTagRecord);
+  },
+
+  async listTaskTagsByTaskIds(taskIds: string[]): Promise<Map<string, TagRecord[]>> {
+    if (taskIds.length === 0) return new Map();
+
+    const database = await getDatabase();
+    const placeholders = taskIds.map((_, index) => `$${index + 1}`).join(", ");
+    const rows = await database.select<TaskTagRow[]>(
+      `SELECT task_tags.task_id, tags.id, tags.name, tags.color, tags.created_at, tags.updated_at
+       FROM task_tags
+       INNER JOIN tags ON tags.id = task_tags.tag_id
+       WHERE task_tags.task_id IN (${placeholders})
+       ORDER BY tags.name COLLATE NOCASE ASC`,
+      taskIds,
+    );
+
+    return rows.reduce((result, row) => {
+      const taskTags = result.get(row.task_id) ?? [];
+      taskTags.push(toTagRecord(row));
+      result.set(row.task_id, taskTags);
+      return result;
+    }, new Map<string, TagRecord[]>());
   },
 
   async attachTagToTask(taskId: string, tagId: string): Promise<void> {

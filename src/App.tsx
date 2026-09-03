@@ -42,6 +42,12 @@ import type { DueReminder, ReminderRecord } from "./features/reminders/reminder-
 import { projectService, type UpdateProjectInput } from "./features/projects/project-service";
 import type { ProjectRecord } from "./features/projects/project-types";
 import { tagService } from "./features/tags/tag-service";
+import {
+  getDisplayTagColor,
+  getTagSuggestions,
+  insertTagToken,
+  parseTaskTagTokens,
+} from "./features/tags/tag-input";
 import type { TagRecord } from "./features/tags/tag-types";
 import { TaskDetailDialog, type TaskDetailSaveInput } from "./features/tasks/task-detail-dialog";
 import { taskService, type UpdateTaskInput } from "./features/tasks/task-service";
@@ -226,6 +232,37 @@ function QuickRescheduleButton({
   );
 }
 
+function TagSuggestionMenu({
+  onSelect,
+  tags,
+  value,
+}: {
+  onSelect: (tag: TagRecord) => void;
+  tags: TagRecord[];
+  value: string;
+}) {
+  const suggestions = getTagSuggestions(value, tags);
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div aria-label="选择标签" className="tag-suggestion-menu" role="listbox">
+      <span>选择标签</span>
+      {suggestions.map((tag) => (
+        <button
+          key={tag.id}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => onSelect(tag)}
+          role="option"
+          style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
+          type="button"
+        >
+          <i aria-hidden="true" />#{tag.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function formatUpcomingDate(localDate: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "long",
@@ -258,6 +295,7 @@ function MainApp() {
   const [activeView, setActiveView] = useState<NavigationItem>("收集箱");
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
+  const [taskTagsById, setTaskTagsById] = useState<Map<string, TagRecord[]>>(new Map());
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
   const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
   const [todayFocusTasks, setTodayFocusTasks] = useState<TaskRecord[]>([]);
@@ -393,9 +431,13 @@ function MainApp() {
           projectService.listProjects(),
           tagService.listTags(),
         ]);
+        const initialTaskTags = await tagService.listTaskTagsByTaskIds(
+          activeTasks.map((task) => task.id),
+        );
         if (!isMounted) return;
 
         setTasks(activeTasks);
+        setTaskTagsById(initialTaskTags);
         setProjects(activeProjects);
         setTags(availableTags);
         setDatabaseState("ready");
@@ -501,7 +543,9 @@ function MainApp() {
       query,
       tagId: tagId ?? undefined,
     });
+    const nextTaskTags = await tagService.listTaskTagsByTaskIds(activeTasks.map((task) => task.id));
     setTasks(activeTasks);
+    setTaskTagsById(nextTaskTags);
   }
 
   function handleRetryDatabase() {
@@ -572,7 +616,15 @@ function MainApp() {
     setIsSavingTask(true);
 
     try {
-      const task = await taskService.createTask({ title: newTaskTitle });
+      const { tagIds, title } = parseTaskTagTokens(newTaskTitle, tags);
+      if (!title) throw new Error("请输入任务内容；标签请写在任务内容后，例如「整理资料 #工作」。");
+
+      const task = await taskService.createTask({ title });
+      await Promise.all(tagIds.map((tagId) => tagService.attachTagToTask(task.id, tagId)));
+      if (tagIds.length > 0) {
+        const taskTags = tags.filter((tag) => tagIds.includes(tag.id));
+        setTaskTagsById((currentTags) => new Map(currentTags).set(task.id, taskTags));
+      }
       if (!activeTagId && !searchQuery && projectFilter === "all" && priorityFilter === "all") {
         setTasks((currentTasks) => [task, ...currentTasks]);
       } else {
@@ -901,6 +953,12 @@ function MainApp() {
       await tagService.attachTagToTask(selectedTask.id, tag.id);
       setTags((currentTags) => [...currentTags, tag]);
       setTaskTags((currentTags) => [...currentTags, tag]);
+      setTaskTagsById((currentTaskTags) => {
+        const nextTaskTags = new Map(currentTaskTags);
+        const attachedTags = nextTaskTags.get(selectedTask.id) ?? [];
+        nextTaskTags.set(selectedTask.id, [...attachedTags, tag]);
+        return nextTaskTags;
+      });
       if (activeTagId === tag.id) await loadInboxTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "创建标签失败，请重试。");
@@ -921,10 +979,26 @@ function MainApp() {
       if (attachedTag) {
         await tagService.detachTagFromTask(selectedTask.id, tagId);
         setTaskTags((currentTags) => currentTags.filter((tag) => tag.id !== tagId));
+        setTaskTagsById((currentTaskTags) => {
+          const nextTaskTags = new Map(currentTaskTags);
+          nextTaskTags.set(
+            selectedTask.id,
+            (nextTaskTags.get(selectedTask.id) ?? []).filter((tag) => tag.id !== tagId),
+          );
+          return nextTaskTags;
+        });
       } else {
         await tagService.attachTagToTask(selectedTask.id, tagId);
         const tag = tags.find((currentTag) => currentTag.id === tagId);
-        if (tag) setTaskTags((currentTags) => [...currentTags, tag]);
+        if (tag) {
+          setTaskTags((currentTags) => [...currentTags, tag]);
+          setTaskTagsById((currentTaskTags) => {
+            const nextTaskTags = new Map(currentTaskTags);
+            const attachedTags = nextTaskTags.get(selectedTask.id) ?? [];
+            nextTaskTags.set(selectedTask.id, [...attachedTags, tag]);
+            return nextTaskTags;
+          });
+        }
       }
       if (activeTagId === tagId) await loadInboxTasks();
     } catch (error) {
@@ -1525,6 +1599,16 @@ function MainApp() {
       await tagService.deleteTag(tag.id);
       setTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
       setTaskTags((currentTags) => currentTags.filter((currentTag) => currentTag.id !== tag.id));
+      setTaskTagsById((currentTaskTags) => {
+        const nextTaskTags = new Map<string, TagRecord[]>();
+        currentTaskTags.forEach((attachedTags, taskId) => {
+          nextTaskTags.set(
+            taskId,
+            attachedTags.filter((attachedTag) => attachedTag.id !== tag.id),
+          );
+        });
+        return nextTaskTags;
+      });
 
       if (activeTagId === tag.id) {
         setActiveTagId(null);
@@ -2855,6 +2939,7 @@ function MainApp() {
                     className={activeTagId === tag.id ? "tag-chip is-selected" : "tag-chip"}
                     key={tag.id}
                     onClick={() => void handleTagFilter(tag.id)}
+                    style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
                     type="button"
                   >
                     {tag.name}
@@ -2891,6 +2976,22 @@ function MainApp() {
                     >
                       {task.title}
                     </button>
+                    {(taskTagsById.get(task.id) ?? []).length > 0 ? (
+                      <div aria-label={`${task.title} 的标签`} className="task-row-tags">
+                        {(taskTagsById.get(task.id) ?? []).map((tag) => (
+                          <button
+                            className="task-tag"
+                            key={tag.id}
+                            onClick={() => void handleTagFilter(tag.id)}
+                            style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
+                            title={`筛选标签：${tag.name}`}
+                            type="button"
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                     <QuickRescheduleButton
                       onReschedule={(selectedTask, target) =>
                         void handleQuickReschedule(selectedTask, target)
@@ -3235,15 +3336,24 @@ function MainApp() {
 
             <form onSubmit={(event) => void handleCreateTask(event)}>
               <label htmlFor="new-task-title">你想记下什么？</label>
-              <input
-                autoFocus
-                disabled={isSavingTask}
-                id="new-task-title"
-                onChange={(event) => setNewTaskTitle(event.target.value)}
-                placeholder="例如：整理本周计划"
-                value={newTaskTitle}
-              />
-              <p className="form-hint">按 Enter 连续添加，按 Esc 关闭窗口。</p>
+              <div className="tag-input-wrap">
+                <input
+                  autoFocus
+                  disabled={isSavingTask}
+                  id="new-task-title"
+                  onChange={(event) => setNewTaskTitle(event.target.value)}
+                  placeholder="例如：整理本周计划 #工作"
+                  value={newTaskTitle}
+                />
+                <TagSuggestionMenu
+                  onSelect={(tag) =>
+                    setNewTaskTitle((currentTitle) => insertTagToken(currentTitle, tag))
+                  }
+                  tags={tags}
+                  value={newTaskTitle}
+                />
+              </div>
+              <p className="form-hint">输入 # 可选择标签；按 Enter 连续添加，按 Esc 关闭窗口。</p>
               {taskError ? <p className="form-error">{taskError}</p> : null}
               <div className="dialog-actions">
                 <button className="secondary-button" onClick={closeQuickAdd} type="button">
