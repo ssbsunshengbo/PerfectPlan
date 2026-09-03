@@ -1,10 +1,11 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, type CSSProperties, type ReactNode, useState } from "react";
 
 import { trapFocusInDialog } from "../../app/accessibility";
 import type { ProjectRecord } from "../projects/project-types";
 import type { NotificationPermissionState } from "../reminders/notification-service";
 import type { ReminderRecord } from "../reminders/reminder-types";
 import type { TagRecord } from "../tags/tag-types";
+import { getDisplayTagColor } from "../tags/tag-input";
 import {
   type RecurrenceFrequency,
   type RecurrenceRule,
@@ -372,6 +373,38 @@ function DurationField({
   );
 }
 
+function TaskDetailSection({
+  children,
+  defaultOpen = false,
+  summary,
+  title,
+}: {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  summary: string;
+  title: string;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <section className={isOpen ? "task-detail-section is-open" : "task-detail-section"}>
+      <button
+        aria-expanded={isOpen}
+        className="task-detail-section-toggle"
+        onClick={() => setIsOpen((current) => !current)}
+        type="button"
+      >
+        <span>{title}</span>
+        <span className="task-detail-section-summary">
+          {summary}
+          <i aria-hidden="true">⌄</i>
+        </span>
+      </button>
+      {isOpen ? <div className="task-detail-section-content">{children}</div> : null}
+    </section>
+  );
+}
+
 function toLocalTime(value: string | null): string {
   if (!value) return "";
 
@@ -543,7 +576,7 @@ export function TaskDetailDialog({
         <div className="quick-add-header">
           <div>
             <p className="eyebrow">任务详情</p>
-            <h2 id="task-details-title">编辑任务</h2>
+            <h2 id="task-details-title">一件待办</h2>
           </div>
           <button
             aria-label="关闭任务详情"
@@ -557,26 +590,21 @@ export function TaskDetailDialog({
         </div>
 
         <form className="task-details-form" onSubmit={handleSubmit}>
-          <label htmlFor="task-detail-title">任务名称</label>
-          <input
-            autoFocus
-            disabled={isSaving}
-            id="task-detail-title"
-            onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
-            value={draft.title}
-          />
+          <label className="task-title-field" htmlFor="task-detail-title">
+            <span>任务标题</span>
+            <input
+              autoFocus
+              disabled={isSaving}
+              id="task-detail-title"
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, title: event.target.value }))
+              }
+              placeholder="写下下一件要做的事"
+              value={draft.title}
+            />
+          </label>
 
-          <label htmlFor="task-detail-notes">备注</label>
-          <textarea
-            disabled={isSaving}
-            id="task-detail-notes"
-            onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))}
-            placeholder="补充背景、下一步或相关链接"
-            rows={4}
-            value={draft.notes}
-          />
-
-          <div className="detail-field-grid">
+          <div className="task-identity-fields">
             <SelectField
               disabled={isSaving}
               id="task-detail-project"
@@ -606,16 +634,20 @@ export function TaskDetailDialog({
             />
           </div>
 
-          <section aria-labelledby="task-schedule-title" className="task-schedule-section">
-            <div className="task-schedule-heading">
-              <div>
-                <p className="eyebrow">时间安排</p>
-                <h3 id="task-schedule-title">决定何时做，而非何时必须完成</h3>
-              </div>
-              <span>
-                {draft.scheduledTime ? "时间块" : draft.scheduledDate ? "全天任务" : "未安排"}
-              </span>
-            </div>
+          <TaskDetailSection
+            defaultOpen
+            summary={
+              draft.scheduledTime
+                ? `${draft.scheduledDate} · ${draft.scheduledTime}`
+                : draft.scheduledDate
+                  ? `${draft.scheduledDate} · 全天`
+                  : "未安排"
+            }
+            title="安排"
+          >
+            <p className="task-detail-section-description">
+              计划日期决定它何时出现；具体时间和时长才会占用日历。
+            </p>
             <div className="detail-field-grid">
               <DatePickerField
                 disabled={isSaving}
@@ -664,15 +696,30 @@ export function TaskDetailDialog({
                 计划日期晚于截止日期；会保留此安排并在后续视图中提示。
               </p>
             ) : null}
-          </section>
-          <section aria-labelledby="task-reminder-title" className="task-reminder-section">
-            <div className="task-recurrence-heading">
-              <div>
-                <p className="eyebrow">本地提醒</p>
-                <h3 id="task-reminder-title">在需要时提醒自己</h3>
-              </div>
-              <span>{draft.reminderDate ? "已设置" : "未设置"}</span>
-            </div>
+          </TaskDetailSection>
+
+          <TaskDetailSection
+            defaultOpen={Boolean(draft.notes)}
+            summary={draft.notes ? "已添加" : "添加备注"}
+            title="备注"
+          >
+            <textarea
+              disabled={isSaving}
+              id="task-detail-notes"
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, notes: event.target.value }))
+              }
+              placeholder="补充背景、下一步或相关链接"
+              rows={4}
+              value={draft.notes}
+            />
+          </TaskDetailSection>
+
+          <TaskDetailSection
+            defaultOpen={Boolean(draft.reminderDate)}
+            summary={draft.reminderDate ? `${draft.reminderDate} ${draft.reminderTime}` : "未设置"}
+            title="提醒"
+          >
             <div className="detail-field-grid">
               <DatePickerField
                 disabled={isSaving}
@@ -712,15 +759,18 @@ export function TaskDetailDialog({
             <p className="reminder-note">
               应用完全退出时不会触发提醒；后台运行能力将在后续版本验证。
             </p>
-          </section>
-          <section aria-labelledby="task-recurrence-title" className="task-recurrence-section">
-            <div className="task-recurrence-heading">
-              <div>
-                <p className="eyebrow">重复</p>
-                <h3 id="task-recurrence-title">完成后再创建下一次</h3>
-              </div>
-              <span>不会预先生成未来任务</span>
-            </div>
+          </TaskDetailSection>
+
+          <TaskDetailSection
+            defaultOpen={Boolean(recurrenceFrequency)}
+            summary={
+              recurrenceFrequency
+                ? (recurrenceOptions.find((option) => option.value === recurrenceFrequency)
+                    ?.label ?? "已设置")
+                : "不重复"
+            }
+            title="重复"
+          >
             <SelectField
               disabled={isSaving}
               id="task-detail-recurrence"
@@ -739,10 +789,10 @@ export function TaskDetailDialog({
                 将沿用项目、标签、优先级和时间安排；修改只影响本次任务。
               </p>
             ) : null}
-          </section>
+          </TaskDetailSection>
           {visibleError ? <p className="form-error">{visibleError}</p> : null}
 
-          <div className="dialog-actions">
+          <div className="dialog-actions task-detail-actions">
             <button
               className="secondary-button"
               disabled={isSaving}
@@ -757,11 +807,11 @@ export function TaskDetailDialog({
           </div>
         </form>
 
-        <section className="tag-section" aria-labelledby="task-tag-title">
-          <div className="subtask-heading">
-            <h3 id="task-tag-title">标签</h3>
-            <span>{taskTags.length}</span>
-          </div>
+        <TaskDetailSection
+          defaultOpen={taskTags.length > 0}
+          summary={taskTags.length ? `${taskTags.length} 个标签` : "未添加"}
+          title="标签"
+        >
           {tags.length > 0 ? (
             <div className="tag-picker" aria-label="选择标签">
               {tags.map((tag) => {
@@ -774,6 +824,7 @@ export function TaskDetailDialog({
                     disabled={isSavingTag}
                     key={tag.id}
                     onClick={() => onToggleTag(tag.id)}
+                    style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
                     type="button"
                   >
                     {tag.name}
@@ -795,13 +846,13 @@ export function TaskDetailDialog({
               {isSavingTag ? "正在创建…" : "创建"}
             </button>
           </form>
-        </section>
+        </TaskDetailSection>
 
-        <section className="subtask-section" aria-labelledby="subtask-title">
-          <div className="subtask-heading">
-            <h3 id="subtask-title">子任务</h3>
-            <span>{subtasks.length}</span>
-          </div>
+        <TaskDetailSection
+          defaultOpen={subtasks.length > 0}
+          summary={subtasks.length ? `${subtasks.length} 项` : "未添加"}
+          title="子任务"
+        >
           {subtasks.length > 0 ? (
             <ul className="subtask-list">
               {subtasks.map((subtask) => (
@@ -831,7 +882,7 @@ export function TaskDetailDialog({
               {isSavingSubtask ? "正在添加…" : "添加"}
             </button>
           </form>
-        </section>
+        </TaskDetailSection>
       </section>
     </div>
   );

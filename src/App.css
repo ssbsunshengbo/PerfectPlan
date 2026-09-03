@@ -665,14 +665,20 @@ h1 {
 .task-row {
   display: flex;
   align-items: center;
-  gap: 13px;
-  min-height: 61px;
+  gap: 12px;
+  min-height: 64px;
   border-bottom: 1px solid var(--line);
-  padding: 12px 24px;
-  transition: background 0.15s ease;
+  padding: 13px 24px;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .task-row:hover {
-  background: #f0f7f2;
+  background: #f8f9fb;
+}
+.task-row:focus-within {
+  background: #f8f9fb;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .task-row:last-child,
 .project-list li:last-child {
@@ -704,13 +710,15 @@ h1 {
 }
 .task-title {
   min-width: 0;
+  flex: 1 1 240px;
   border: 0;
   background: transparent;
   padding: 0;
   color: var(--ink);
   overflow: hidden;
   font-size: 15px;
-  font-weight: 580;
+  font-weight: 630;
+  letter-spacing: -0.012em;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -721,20 +729,21 @@ h1 {
 .task-row-tags {
   display: flex;
   min-width: 0;
-  flex: 0 1 auto;
-  gap: 5px;
+  flex: 0 1 220px;
+  gap: 6px;
+  overflow: hidden;
 }
 .task-tag {
-  max-width: 96px;
+  max-width: 110px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--tag-color) 34%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--tag-color) 12%, #fff);
-  padding: 3px 7px;
+  padding: 4px 8px;
   color: color-mix(in srgb, var(--tag-color) 82%, #253229);
   cursor: pointer;
-  font-size: 10px;
-  font-weight: 720;
+  font-size: 11px;
+  font-weight: 680;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2962,6 +2971,154 @@ h1 {
   gap: 9px;
   margin-top: 24px;
 }
+.task-details-dialog {
+  width: min(100%, 720px);
+}
+.task-details-form {
+  gap: 0;
+}
+.task-title-field {
+  display: block !important;
+  margin: 0 0 18px;
+}
+.task-title-field > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.task-details-form > .task-title-field input {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 1px 4px;
+  font-family: "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: clamp(24px, 3.2vw, 31px);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+}
+.task-details-form > .task-title-field input:focus {
+  border: 0;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.task-identity-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.72fr);
+  gap: 12px;
+  padding: 0 0 16px;
+}
+.task-detail-section {
+  border-top: 1px solid var(--line);
+}
+.task-detail-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 54px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 710;
+  text-align: left;
+}
+.task-detail-section-toggle:hover {
+  color: var(--accent-deep);
+}
+.task-detail-section-summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 560;
+  text-align: right;
+}
+.task-detail-section-summary i {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+.task-detail-section.is-open .task-detail-section-summary i {
+  transform: rotate(180deg);
+}
+.task-detail-section-content {
+  display: grid;
+  gap: 14px;
+  padding: 2px 0 18px;
+  animation: detail-section-enter 150ms ease-out;
+}
+@keyframes detail-section-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.task-detail-section-description {
+  margin: -2px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.task-detail-section-content .tag-picker {
+  margin: 0;
+}
+.task-detail-section-content .subtask-list {
+  margin: 0;
+}
+.task-detail-section-content .subtask-empty {
+  margin: 0;
+}
+.task-detail-section-content .subtask-create-form {
+  margin-top: 2px;
+}
+.task-detail-actions {
+  position: sticky;
+  z-index: 1;
+  bottom: -26px;
+  margin: 0 -26px;
+  border-top: 1px solid var(--line);
+  background: rgb(255 255 255 / 96%);
+  backdrop-filter: blur(14px);
+  padding: 16px 26px 0;
+}
+.quick-add-dialog .tag-input-wrap input {
+  min-height: 48px;
+  border-radius: 12px;
+  padding-inline: 14px;
+  font-size: 16px;
+}
+.quick-add-dialog .form-hint {
+  padding-left: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-detail-section-content,
+  .task-detail-section-summary i {
+    animation: none;
+    transition: none;
+  }
+}
 
 @media (max-width: 820px) {
   .app-shell {
@@ -3153,6 +3310,15 @@ h1 {
   }
   .task-details-dialog > .quick-add-header {
     background: rgb(32 44 39 / 96%);
+  }
+  .task-detail-actions {
+    background: rgb(32 44 39 / 96%);
+  }
+  .task-detail-section-summary i {
+    background: #26342e;
+  }
+  .task-row:focus-within {
+    background: rgb(105 171 134 / 8%);
   }
   .quick-add-dialog,
   .task-details-dialog,
