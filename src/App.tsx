@@ -651,6 +651,13 @@ function MainApp() {
     setTaskTagsById(nextTaskTags);
   }
 
+  async function loadTaskCatalog() {
+    const listedTasks = await taskService.listTasks();
+    const nextTaskTags = await tagService.listTaskTagsByTaskIds(listedTasks.map((task) => task.id));
+    setTasks(listedTasks);
+    setTaskTagsById(nextTaskTags);
+  }
+
   function handleRetryDatabase() {
     resetDatabaseConnection();
     setTaskError(null);
@@ -1258,6 +1265,7 @@ function MainApp() {
       if (item === "今日") await loadTodayTasks();
       if (item === "即将到来") await loadUpcomingTasks();
       if (item === "日历") await loadCalendarTasks();
+      if (item === "项目" || item === "标签") await loadTaskCatalog();
       if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
@@ -1529,6 +1537,23 @@ function MainApp() {
     }
   }
 
+  async function handleOpenTagTasks(tagId: string) {
+    setActiveTagId(tagId);
+    setSearchQuery("");
+    setSearchInputValue("");
+    setPriorityFilter("all");
+    setProjectFilter("all");
+    setActiveView("收集箱");
+    setIsViewLoading(true);
+    try {
+      await loadInboxTasks(tagId, "", "all", "all");
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "无法读取标签任务，请重试。");
+    } finally {
+      setIsViewLoading(false);
+    }
+  }
+
   function startCalendarResize(event: PointerEvent<HTMLButtonElement>, task: TaskRecord) {
     const startMinutes = minutesFromCalendarStartAt(task.scheduledStartAt);
     if (!task.scheduledDate || startMinutes === null) return;
@@ -1792,6 +1817,27 @@ function MainApp() {
   );
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
+  const taskStatsByProjectId = useMemo(() => {
+    const stats = new Map<string, { active: number; completed: number }>();
+    tasks.forEach((task) => {
+      if (!task.projectId) return;
+      const current = stats.get(task.projectId) ?? { active: 0, completed: 0 };
+      current[task.status === "completed" ? "completed" : "active"] += 1;
+      stats.set(task.projectId, current);
+    });
+    return stats;
+  }, [tasks]);
+  const taskStatsByTagId = useMemo(() => {
+    const stats = new Map<string, { active: number; completed: number }>();
+    tasks.forEach((task) => {
+      (taskTagsById.get(task.id) ?? []).forEach((tag) => {
+        const current = stats.get(tag.id) ?? { active: 0, completed: 0 };
+        current[task.status === "completed" ? "completed" : "active"] += 1;
+        stats.set(tag.id, current);
+      });
+    });
+    return stats;
+  }, [taskTagsById, tasks]);
   const todayFocusTaskIds = new Set(todayFocusTasks.map((task) => task.id));
   const todayOtherTaskIds = new Set([
     ...todayCarryoverSuggestions.map((task) => task.id),
@@ -3273,60 +3319,67 @@ function MainApp() {
             </div>
             {activeProjects.length > 0 ? (
               <ul>
-                {activeProjects.map((project, index) => (
-                  <li className="project-row" key={project.id}>
-                    <span
-                      aria-hidden="true"
-                      className="project-color"
-                      style={{ backgroundColor: project.color ?? "#98a6b5" }}
-                    />
-                    <button
-                      aria-label={`查看项目「${project.name}」下的所有任务`}
-                      className="project-summary project-summary-button"
-                      onClick={() => void handleOpenProjectTasks(project.id)}
-                      type="button"
-                    >
-                      <strong>{project.name}</strong>
-                      <span>
-                        {tasks.filter((task) => task.projectId === project.id).length} 条活动任务
-                      </span>
-                    </button>
-                    <div className="project-actions">
+                {activeProjects.map((project, index) => {
+                  const taskStats = taskStatsByProjectId.get(project.id) ?? {
+                    active: 0,
+                    completed: 0,
+                  };
+
+                  return (
+                    <li className="project-row" key={project.id}>
+                      <span
+                        aria-hidden="true"
+                        className="project-color"
+                        style={{ backgroundColor: project.color ?? "#98a6b5" }}
+                      />
                       <button
-                        className="secondary-button"
+                        aria-label={`查看项目「${project.name}」下的所有任务`}
+                        className="project-summary project-summary-button"
                         onClick={() => void handleOpenProjectTasks(project.id)}
                         type="button"
                       >
-                        查看任务
+                        <strong>{project.name}</strong>
+                        <span>
+                          {taskStats.active} 待办 · {taskStats.completed} 已完成
+                        </span>
                       </button>
-                      <button
-                        aria-label={`上移项目：${project.name}`}
-                        className="project-action-button"
-                        disabled={index === 0}
-                        onClick={() => void handleMoveProject(project.id, -1)}
-                        type="button"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        aria-label={`下移项目：${project.name}`}
-                        className="project-action-button"
-                        disabled={index === activeProjects.length - 1}
-                        onClick={() => void handleMoveProject(project.id, 1)}
-                        type="button"
-                      >
-                        ↓
-                      </button>
-                      <button
-                        className="secondary-button"
-                        onClick={() => openProjectEditor(project)}
-                        type="button"
-                      >
-                        管理
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                      <div className="project-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => void handleOpenProjectTasks(project.id)}
+                          type="button"
+                        >
+                          查看任务
+                        </button>
+                        <button
+                          aria-label={`上移项目：${project.name}`}
+                          className="project-action-button"
+                          disabled={index === 0}
+                          onClick={() => void handleMoveProject(project.id, -1)}
+                          type="button"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          aria-label={`下移项目：${project.name}`}
+                          className="project-action-button"
+                          disabled={index === activeProjects.length - 1}
+                          onClick={() => void handleMoveProject(project.id, 1)}
+                          type="button"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          className="secondary-button"
+                          onClick={() => openProjectEditor(project)}
+                          type="button"
+                        >
+                          管理
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="project-empty">还没有项目。先创建一个，用来归纳相关任务。</p>
@@ -3369,23 +3422,47 @@ function MainApp() {
             </div>
             {tags.length > 0 ? (
               <ul>
-                {tags.map((tag) => (
-                  <li className="project-row" key={tag.id}>
-                    <span aria-hidden="true" className="tag-color" />
-                    <div className="project-summary">
-                      <strong>{tag.name}</strong>
-                      <span>删除后只会解除任务关联，不会删除任务</span>
-                    </div>
-                    <button
-                      className="danger-button"
-                      disabled={isSavingTag}
-                      onClick={() => void handleDeleteTag(tag)}
-                      type="button"
-                    >
-                      删除
-                    </button>
-                  </li>
-                ))}
+                {tags.map((tag) => {
+                  const taskStats = taskStatsByTagId.get(tag.id) ?? { active: 0, completed: 0 };
+
+                  return (
+                    <li className="project-row" key={tag.id}>
+                      <span
+                        aria-hidden="true"
+                        className="tag-color"
+                        style={{ background: getDisplayTagColor(tag) }}
+                      />
+                      <button
+                        aria-label={`查看标签「${tag.name}」下的所有任务`}
+                        className="project-summary project-summary-button"
+                        onClick={() => void handleOpenTagTasks(tag.id)}
+                        type="button"
+                      >
+                        <strong>{tag.name}</strong>
+                        <span>
+                          {taskStats.active} 待办 · {taskStats.completed} 已完成
+                        </span>
+                      </button>
+                      <div className="project-actions">
+                        <button
+                          className="secondary-button"
+                          onClick={() => void handleOpenTagTasks(tag.id)}
+                          type="button"
+                        >
+                          查看任务
+                        </button>
+                        <button
+                          className="danger-button"
+                          disabled={isSavingTag}
+                          onClick={() => void handleDeleteTag(tag)}
+                          type="button"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="project-empty">还没有标签。可在任务详情中创建并添加标签。</p>
