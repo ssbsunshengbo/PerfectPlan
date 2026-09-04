@@ -2102,32 +2102,28 @@ h1 {
   right: 13px;
   gap: 4px;
 }
-.project-action-button {
-  display: grid;
-  width: 29px;
-  height: 29px;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--muted);
-}
-.project-action-button:hover:not(:disabled) {
-  color: var(--accent-deep);
-}
 .project-manage-button {
-  display: grid;
   width: 30px;
   height: 29px;
-  place-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+  padding: 0;
   color: var(--muted);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  line-height: 1;
+  font-size: 0;
+  line-height: 0;
+}
+.project-manage-button::after {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentcolor;
+  box-shadow:
+    6px 0 currentcolor,
+    12px 0 currentcolor;
+  content: "";
+  transform: translateX(-6px);
 }
 .project-manage-button:hover {
   border-color: #a4c1b0;
@@ -3439,7 +3435,7 @@ h1 {
   .task-details-form select,
   .subtask-create-form input,
   .secondary-button,
-  .project-action-button {
+  .project-manage-button {
     background: #26342e;
     color: var(--ink);
   }

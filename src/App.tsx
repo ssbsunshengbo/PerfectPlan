@@ -1741,33 +1741,6 @@ function MainApp() {
     return projects.find((project) => project.id === task.projectId)?.color ?? "#8bad99";
   }
 
-  async function handleMoveProject(projectId: string, direction: -1 | 1) {
-    const currentIndex = activeProjects.findIndex((project) => project.id === projectId);
-    const targetIndex = currentIndex + direction;
-
-    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= activeProjects.length) return;
-
-    const reorderedProjects = [...activeProjects];
-    const [project] = reorderedProjects.splice(currentIndex, 1);
-    if (!project) return;
-    reorderedProjects.splice(targetIndex, 0, project);
-
-    setTaskError(null);
-    try {
-      const updatedProjects = await Promise.all(
-        reorderedProjects.map((currentProject, index) =>
-          projectService.updateProject(currentProject.id, { sortOrder: index }),
-        ),
-      );
-      setProjects((currentProjects) => [
-        ...updatedProjects,
-        ...currentProjects.filter((currentProject) => currentProject.status === "archived"),
-      ]);
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "调整项目排序失败，请重试。");
-    }
-  }
-
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="主导航">
@@ -2979,7 +2952,7 @@ function MainApp() {
             </div>
             {activeProjects.length > 0 ? (
               <ul className="project-grid">
-                {activeProjects.map((project, index) => {
+                {activeProjects.map((project) => {
                   const taskStats = taskStatsByProjectId.get(project.id) ?? {
                     active: 0,
                     completed: 0,
@@ -3012,31 +2985,11 @@ function MainApp() {
                       </button>
                       <div className="project-actions">
                         <button
-                          aria-label={`上移项目：${project.name}`}
-                          className="project-action-button"
-                          disabled={index === 0}
-                          onClick={() => void handleMoveProject(project.id, -1)}
-                          type="button"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          aria-label={`下移项目：${project.name}`}
-                          className="project-action-button"
-                          disabled={index === activeProjects.length - 1}
-                          onClick={() => void handleMoveProject(project.id, 1)}
-                          type="button"
-                        >
-                          ↓
-                        </button>
-                        <button
                           aria-label={`管理项目：${project.name}`}
                           className="project-manage-button"
                           onClick={() => openProjectEditor(project)}
                           type="button"
-                        >
-                          ···
-                        </button>
+                        />
                       </div>
                     </li>
                   );
