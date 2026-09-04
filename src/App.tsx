@@ -2392,7 +2392,7 @@ function MainApp() {
                   }
                 >
                   <div className="calendar-day-headings">
-                    <span />
+                    <span aria-hidden="true" className="calendar-day-heading-spacer" />
                     {calendarDates.map((date) => {
                       const isTodayDate = date === toLocalDateValue();
                       const dayMinutes = calendarDayLoadMinutesByDate.get(date) ?? 0;
