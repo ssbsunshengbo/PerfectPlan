@@ -1728,21 +1728,9 @@ h1 {
 .today-section.is-overdue {
   border-color: #efd0c8;
 }
-.today-section.is-candidates,
+.today-section.is-suggestions,
 .today-section.is-completed {
   background: rgb(248 250 247 / 82%);
-}
-.today-section.is-carryover {
-  border-color: #ccd5ec;
-  background: linear-gradient(135deg, rgb(244 246 255 / 98%), rgb(255 254 250 / 94%));
-}
-.carryover-intro {
-  margin: 0;
-  border-top: 1px solid rgb(207 215 235 / 72%);
-  padding: 13px 20px;
-  color: #68728d;
-  font-size: 12px;
-  line-height: 1.55;
 }
 .today-section-header {
   display: flex;
@@ -1821,8 +1809,18 @@ h1 {
   color: var(--danger);
 }
 .today-more {
+  display: block;
+  width: 100%;
+  border: 0;
   border-top: 1px solid rgb(220 228 221 / 85%);
+  background: transparent;
   padding: 11px 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.today-more:hover {
+  background: rgb(240 247 242 / 72%);
+  color: var(--accent-deep);
 }
 .today-collapse-button {
   display: flex;
@@ -1847,6 +1845,32 @@ h1 {
   font-family: Georgia, "Songti SC", serif;
   font-size: 16px;
   font-weight: 600;
+}
+.today-collapse-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 730;
+}
+.today-collapse-meta i {
+  font-size: 15px;
+  font-style: normal;
+  line-height: 1;
+}
+.today-suggestions-content {
+  border-top: 1px solid rgb(220 228 221 / 85%);
+}
+.today-suggestion-group + .today-suggestion-group {
+  border-top: 1px solid rgb(220 228 221 / 85%);
+}
+.today-suggestion-group > p {
+  margin: 0;
+  padding: 12px 20px 8px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 740;
 }
 .today-task-list.is-completed .task-title {
   color: var(--faint);

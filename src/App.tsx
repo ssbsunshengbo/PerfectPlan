@@ -345,6 +345,7 @@ function MainApp() {
   const [todayCompletedTasks, setTodayCompletedTasks] = useState<TaskRecord[]>([]);
   const [todayCandidateTasks, setTodayCandidateTasks] = useState<TaskRecord[]>([]);
   const [isCompletedTodayExpanded, setIsCompletedTodayExpanded] = useState(false);
+  const [isTodaySuggestionsExpanded, setIsTodaySuggestionsExpanded] = useState(false);
   const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>("week");
   const [calendarAnchorDate, setCalendarAnchorDate] = useState(() => toLocalDateValue());
   const [calendarTasks, setCalendarTasks] = useState<TaskRecord[]>([]);
@@ -1715,6 +1716,7 @@ function MainApp() {
   const todayCandidates = todayCandidateTasks.filter(
     (task) => !todayFocusTaskIds.has(task.id) && !todayOtherTaskIds.has(task.id),
   );
+  const todaySuggestionCount = todayCarryoverSuggestions.length + todayCandidates.length;
   const todayLabel = formatTodayLabel(toLocalDateValue());
   const calendarWeekStart = startOfWeek(calendarAnchorDate);
   const calendarMonthStart = (() => {
@@ -2145,107 +2147,124 @@ function MainApp() {
               )}
             </section>
 
-            {todayCarryoverSuggestions.length > 0 ? (
+            {todaySuggestionCount > 0 ? (
               <section
-                aria-labelledby="today-carryover-title"
-                className="today-section is-carryover"
+                aria-labelledby="today-suggestions-title"
+                className="today-section is-suggestions"
               >
-                <div className="today-section-header">
-                  <div>
-                    <p className="eyebrow">从昨日继续</p>
-                    <h3 id="today-carryover-title">留给今天再决定</h3>
+                <button
+                  aria-expanded={isTodaySuggestionsExpanded}
+                  className="today-collapse-button"
+                  onClick={() => setIsTodaySuggestionsExpanded((current) => !current)}
+                  type="button"
+                >
+                  <span>
+                    <span className="eyebrow">待挑选</span>
+                    <strong id="today-suggestions-title">从任务中选择今天的重点</strong>
+                  </span>
+                  <span className="today-collapse-meta">
+                    {todaySuggestionCount} 项
+                    <i aria-hidden="true">{isTodaySuggestionsExpanded ? "⌃" : "⌄"}</i>
+                  </span>
+                </button>
+                {isTodaySuggestionsExpanded ? (
+                  <div className="today-suggestions-content">
+                    {todayCarryoverSuggestions.length > 0 ? (
+                      <div className="today-suggestion-group">
+                        <p>从昨日保留</p>
+                        <ul className="today-task-list">
+                          {todayCarryoverSuggestions.map((task) => (
+                            <li className="today-task-row" key={task.id}>
+                              <button
+                                aria-label={`完成任务：${task.title}`}
+                                className="task-complete-button"
+                                onClick={() => void handleCompleteTask(task)}
+                                type="button"
+                              />
+                              <button
+                                className="task-title"
+                                onClick={() => void openTaskDetails(task)}
+                                type="button"
+                              >
+                                {task.title}
+                              </button>
+                              <QuickRescheduleButton
+                                onReschedule={(selectedTask, target) =>
+                                  void handleQuickReschedule(selectedTask, target)
+                                }
+                                task={task}
+                              />
+                              <button
+                                className="today-action-button"
+                                onClick={() => void handleAddFocusTask(task)}
+                                type="button"
+                              >
+                                设为重点
+                              </button>
+                              <InlineSubtaskDisclosure
+                                isExpanded={expandedSubtaskParentIds.has(task.id)}
+                                onComplete={(subtask) =>
+                                  void handleCompleteInlineSubtask(task.id, subtask)
+                                }
+                                onToggle={() => toggleInlineSubtasks(task.id)}
+                                parentTask={task}
+                                subtasks={subtasksByParentId.get(task.id) ?? []}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {todayCandidates.length > 0 ? (
+                      <div className="today-suggestion-group">
+                        <p>其他任务</p>
+                        <ul className="today-task-list">
+                          {todayCandidates.slice(0, 8).map((task) => (
+                            <li className="today-task-row" key={task.id}>
+                              <button
+                                className="task-title"
+                                onClick={() => void openTaskDetails(task)}
+                                type="button"
+                              >
+                                {task.title}
+                              </button>
+                              <QuickRescheduleButton
+                                onReschedule={(selectedTask, target) =>
+                                  void handleQuickReschedule(selectedTask, target)
+                                }
+                                task={task}
+                              />
+                              <button
+                                className="today-action-button"
+                                onClick={() => void handleAddFocusTask(task)}
+                                type="button"
+                              >
+                                设为重点
+                              </button>
+                              <InlineSubtaskDisclosure
+                                isExpanded={expandedSubtaskParentIds.has(task.id)}
+                                onComplete={(subtask) =>
+                                  void handleCompleteInlineSubtask(task.id, subtask)
+                                }
+                                onToggle={() => toggleInlineSubtasks(task.id)}
+                                parentTask={task}
+                                subtasks={subtasksByParentId.get(task.id) ?? []}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                        {todayCandidates.length > 8 ? (
+                          <button
+                            className="today-more"
+                            onClick={() => void handleNavigation("任务")}
+                            type="button"
+                          >
+                            还有 {todayCandidates.length - 8} 项，前往任务页查看
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
-                  <span className="today-section-count">{todayCarryoverSuggestions.length}</span>
-                </div>
-                <p className="carryover-intro">这些任务仍保留在原项目中；需要时再设为今日重点。</p>
-                <ul className="today-task-list">
-                  {todayCarryoverSuggestions.map((task) => (
-                    <li className="today-task-row" key={task.id}>
-                      <button
-                        aria-label={`完成任务：${task.title}`}
-                        className="task-complete-button"
-                        onClick={() => void handleCompleteTask(task)}
-                        type="button"
-                      />
-                      <button
-                        className="task-title"
-                        onClick={() => void openTaskDetails(task)}
-                        type="button"
-                      >
-                        {task.title}
-                      </button>
-                      <QuickRescheduleButton
-                        onReschedule={(selectedTask, target) =>
-                          void handleQuickReschedule(selectedTask, target)
-                        }
-                        task={task}
-                      />
-                      <button
-                        className="today-action-button"
-                        onClick={() => void handleAddFocusTask(task)}
-                        type="button"
-                      >
-                        设为重点
-                      </button>
-                      <InlineSubtaskDisclosure
-                        isExpanded={expandedSubtaskParentIds.has(task.id)}
-                        onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
-                        onToggle={() => toggleInlineSubtasks(task.id)}
-                        parentTask={task}
-                        subtasks={subtasksByParentId.get(task.id) ?? []}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {todayCandidates.length > 0 ? (
-              <section
-                aria-labelledby="today-candidates-title"
-                className="today-section is-candidates"
-              >
-                <div className="today-section-header">
-                  <div>
-                    <p className="eyebrow">可选任务</p>
-                    <h3 id="today-candidates-title">从任务里挑选</h3>
-                  </div>
-                </div>
-                <ul className="today-task-list">
-                  {todayCandidates.slice(0, 8).map((task) => (
-                    <li className="today-task-row" key={task.id}>
-                      <button
-                        className="task-title"
-                        onClick={() => void openTaskDetails(task)}
-                        type="button"
-                      >
-                        {task.title}
-                      </button>
-                      <QuickRescheduleButton
-                        onReschedule={(selectedTask, target) =>
-                          void handleQuickReschedule(selectedTask, target)
-                        }
-                        task={task}
-                      />
-                      <button
-                        className="today-action-button"
-                        onClick={() => void handleAddFocusTask(task)}
-                        type="button"
-                      >
-                        设为重点
-                      </button>
-                      <InlineSubtaskDisclosure
-                        isExpanded={expandedSubtaskParentIds.has(task.id)}
-                        onComplete={(subtask) => void handleCompleteInlineSubtask(task.id, subtask)}
-                        onToggle={() => toggleInlineSubtasks(task.id)}
-                        parentTask={task}
-                        subtasks={subtasksByParentId.get(task.id) ?? []}
-                      />
-                    </li>
-                  ))}
-                </ul>
-                {todayCandidates.length > 8 ? (
-                  <p className="today-more">还有 {todayCandidates.length - 8} 条任务可选</p>
                 ) : null}
               </section>
             ) : null}
