@@ -105,6 +105,12 @@ type CalendarDragPreview = {
   dropStartMinutes: number | null;
   task: TaskRecord;
 };
+type CalendarDropTarget = {
+  dropDate: string | null;
+  dropKind: CalendarDragPreview["dropKind"];
+  dropStartMinutes: number | null;
+  target: HTMLElement | null;
+};
 function toLocalDateValue(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate(),
@@ -309,6 +315,9 @@ function MainApp() {
   const [calendarResize, setCalendarResize] = useState<CalendarResizeState | null>(null);
   const [calendarDragPreview, setCalendarDragPreview] = useState<CalendarDragPreview | null>(null);
   const calendarPointerDragRef = useRef<CalendarPointerDragState | null>(null);
+  const calendarDropTargetRef = useRef<CalendarDropTarget | null>(null);
+  const calendarDragPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const calendarAutoScrollFrameRef = useRef<number | null>(null);
   const suppressCalendarTaskClickRef = useRef(false);
   const [isSavingCalendarSchedule, setIsSavingCalendarSchedule] = useState(false);
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
@@ -1270,6 +1279,8 @@ function MainApp() {
 
   function startCalendarTaskDrag(event: PointerEvent<HTMLElement>, task: TaskRecord) {
     if (event.button !== 0) return;
+    calendarDropTargetRef.current = null;
+    calendarDragPointerRef.current = null;
     calendarPointerDragRef.current = {
       hasMoved: false,
       pointerId: event.pointerId,
@@ -1300,9 +1311,9 @@ function MainApp() {
   useEffect(() => {
     if (activeView !== "日历") return;
 
-    function getDropTarget(clientX: number, clientY: number) {
+    function getDropTarget(clientX: number, clientY: number): CalendarDropTarget {
       const element = document.elementFromPoint(clientX, clientY);
-      const target = element?.closest<HTMLElement>("[data-calendar-drop-kind]");
+      const target = element?.closest<HTMLElement>("[data-calendar-drop-kind]") ?? null;
       const dropDate = target?.dataset.calendarDropDate ?? null;
       const rawDropKind = target?.dataset.calendarDropKind;
       const dropKind: CalendarDragPreview["dropKind"] =
@@ -1315,6 +1326,58 @@ function MainApp() {
       return { dropDate, dropKind, dropStartMinutes, target };
     }
 
+    function updateDragPreview(drag: CalendarPointerDragState, clientX: number, clientY: number) {
+      const dropTarget = getDropTarget(clientX, clientY);
+      calendarDropTargetRef.current = dropTarget;
+      setCalendarDragPreview({
+        clientX,
+        clientY,
+        dropDate: dropTarget.dropDate,
+        dropKind: dropTarget.dropKind,
+        dropStartMinutes: dropTarget.dropStartMinutes,
+        task: drag.task,
+      });
+    }
+
+    function stopAutoScroll() {
+      if (calendarAutoScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(calendarAutoScrollFrameRef.current);
+        calendarAutoScrollFrameRef.current = null;
+      }
+      calendarDragPointerRef.current = null;
+    }
+
+    function autoScrollDuringDrag() {
+      const drag = calendarPointerDragRef.current;
+      const pointer = calendarDragPointerRef.current;
+      if (!drag?.hasMoved || !pointer) {
+        calendarAutoScrollFrameRef.current = null;
+        return;
+      }
+
+      const edgeSize = 72;
+      const distanceToBottom = window.innerHeight - pointer.clientY;
+      const scrollDistance =
+        pointer.clientY < edgeSize
+          ? -Math.ceil((edgeSize - pointer.clientY) / 6)
+          : distanceToBottom < edgeSize
+            ? Math.ceil((edgeSize - distanceToBottom) / 6)
+            : 0;
+      if (scrollDistance === 0) {
+        calendarAutoScrollFrameRef.current = null;
+        return;
+      }
+
+      window.scrollBy(0, scrollDistance);
+      updateDragPreview(drag, pointer.clientX, pointer.clientY);
+      calendarAutoScrollFrameRef.current = window.requestAnimationFrame(autoScrollDuringDrag);
+    }
+
+    function startAutoScrollIfNeeded() {
+      if (calendarAutoScrollFrameRef.current !== null) return;
+      calendarAutoScrollFrameRef.current = window.requestAnimationFrame(autoScrollDuringDrag);
+    }
+
     function updatePointerDrag(event: globalThis.PointerEvent) {
       const drag = calendarPointerDragRef.current;
       if (!drag || event.pointerId !== drag.pointerId) return;
@@ -1325,30 +1388,15 @@ function MainApp() {
         document.body.style.userSelect = "none";
       }
 
-      const edgeSize = 72;
-      const distanceToBottom = window.innerHeight - event.clientY;
-      const scrollDistance =
-        event.clientY < edgeSize
-          ? -Math.ceil((edgeSize - event.clientY) / 6)
-          : distanceToBottom < edgeSize
-            ? Math.ceil((edgeSize - distanceToBottom) / 6)
-            : 0;
-      if (scrollDistance !== 0) window.scrollBy(0, scrollDistance);
-
-      const { dropDate, dropKind, dropStartMinutes } = getDropTarget(event.clientX, event.clientY);
-      setCalendarDragPreview({
-        clientX: event.clientX,
-        clientY: event.clientY,
-        dropDate,
-        dropKind,
-        dropStartMinutes,
-        task: drag.task,
-      });
+      calendarDragPointerRef.current = { clientX: event.clientX, clientY: event.clientY };
+      updateDragPreview(drag, event.clientX, event.clientY);
+      startAutoScrollIfNeeded();
     }
 
     function finishPointerDrag(event: globalThis.PointerEvent) {
       const drag = calendarPointerDragRef.current;
       calendarPointerDragRef.current = null;
+      stopAutoScroll();
       document.body.style.userSelect = "";
       setCalendarDragPreview(null);
       if (!drag?.hasMoved) return;
@@ -1358,10 +1406,11 @@ function MainApp() {
         suppressCalendarTaskClickRef.current = false;
       }, 0);
 
-      const { dropDate, dropKind, dropStartMinutes, target } = getDropTarget(
-        event.clientX,
-        event.clientY,
-      );
+      const immediateDropTarget = getDropTarget(event.clientX, event.clientY);
+      const { dropDate, dropKind, dropStartMinutes, target } = immediateDropTarget.dropKind
+        ? immediateDropTarget
+        : (calendarDropTargetRef.current ?? immediateDropTarget);
+      calendarDropTargetRef.current = null;
       if (!dropKind || !target) return;
       if (dropKind === "task-pool") {
         returnCalendarPointerDrop(drag.task);
@@ -1378,6 +1427,8 @@ function MainApp() {
 
     function cancelPointerDrag() {
       calendarPointerDragRef.current = null;
+      calendarDropTargetRef.current = null;
+      stopAutoScroll();
       document.body.style.userSelect = "";
       setCalendarDragPreview(null);
     }
@@ -1389,6 +1440,7 @@ function MainApp() {
       window.removeEventListener("pointermove", updatePointerDrag);
       window.removeEventListener("pointerup", finishPointerDrag);
       window.removeEventListener("pointercancel", cancelPointerDrag);
+      stopAutoScroll();
       document.body.style.userSelect = "";
     };
   }, [activeView]);
