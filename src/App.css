@@ -1356,11 +1356,6 @@ h1 {
   border-color: var(--task-color);
   background: color-mix(in srgb, var(--task-color) 16%, var(--panel));
 }
-.calendar-empty-day {
-  padding: 5px 2px;
-  color: #a8b2ac;
-  font-size: 10px;
-}
 .calendar-time-area {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
@@ -1619,13 +1614,26 @@ h1 {
 .calendar-candidates .eyebrow {
   margin-bottom: 5px;
 }
+.calendar-candidates-heading .eyebrow span {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
 .calendar-candidates h3 {
   margin: 0;
   font-family: Georgia, "Songti SC", serif;
   font-size: 17px;
   font-weight: 600;
 }
-.calendar-candidates > div > p:last-child {
+.calendar-candidates-heading > p:last-child {
   margin: 7px 0 0;
   color: var(--muted);
   font-size: 11px;

@@ -2425,36 +2425,32 @@ function MainApp() {
                           data-calendar-drop-kind="all-day"
                           key={date}
                         >
-                          {allDayTasks.length > 0 ? (
-                            allDayTasks.map((task) => (
-                              <button
-                                className={
-                                  task.status === "completed"
-                                    ? "calendar-all-day-task is-completed"
-                                    : "calendar-all-day-task"
-                                }
-                                key={task.id}
-                                onClick={(event) => handleCalendarTaskClick(event, task)}
-                                onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
-                                onPointerDown={(event) => {
-                                  if (task.status === "active") startCalendarTaskDrag(event, task);
-                                }}
-                                style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
-                                type="button"
-                              >
-                                <span>
-                                  {task.status === "completed"
-                                    ? "已完成"
-                                    : task.priority === 3
-                                      ? "高"
-                                      : "全天"}
-                                </span>
-                                {task.title}
-                              </button>
-                            ))
-                          ) : (
-                            <span className="calendar-empty-day">尚未安排</span>
-                          )}
+                          {allDayTasks.map((task) => (
+                            <button
+                              className={
+                                task.status === "completed"
+                                  ? "calendar-all-day-task is-completed"
+                                  : "calendar-all-day-task"
+                              }
+                              key={task.id}
+                              onClick={(event) => handleCalendarTaskClick(event, task)}
+                              onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
+                              onPointerDown={(event) => {
+                                if (task.status === "active") startCalendarTaskDrag(event, task);
+                              }}
+                              style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
+                              type="button"
+                            >
+                              <span>
+                                {task.status === "completed"
+                                  ? "已完成"
+                                  : task.priority === 3
+                                    ? "高"
+                                    : "全天"}
+                              </span>
+                              {task.title}
+                            </button>
+                          ))}
                         </div>
                       );
                     })}
@@ -2613,9 +2609,11 @@ function MainApp() {
               )}
 
               <aside aria-labelledby="calendar-candidates-title" className="calendar-candidates">
-                <div>
-                  <p className="eyebrow">待安排</p>
-                  <h3 id="calendar-candidates-title">先决定放在哪天</h3>
+                <div className="calendar-candidates-heading">
+                  <p className="eyebrow">
+                    待安排 <span>{calendarCandidateTasks.length}</span>
+                  </p>
+                  <h3 id="calendar-candidates-title">任务池</h3>
                   <p>拖到日期安排全天，拖到时间网格安排具体时间；按 A 也可键盘安排。</p>
                 </div>
                 {calendarCandidateTasks.length > 0 ? (
