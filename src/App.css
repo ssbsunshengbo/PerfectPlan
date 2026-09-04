@@ -876,6 +876,62 @@ h1 {
 .task-title:hover {
   color: var(--accent-deep);
 }
+.task-row-meta {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+.task-row-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-row-meta > span.is-due {
+  color: #ad6639;
+}
+.task-project-chip {
+  max-width: 112px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--project-color) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--project-color) 10%, #fff);
+  padding: 3px 8px;
+  color: color-mix(in srgb, var(--project-color) 78%, #253229);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-project-chip:hover {
+  border-color: var(--project-color);
+  background: color-mix(in srgb, var(--project-color) 18%, #fff);
+}
+.task-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.task-priority::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentcolor;
+  content: "";
+}
+.task-priority.priority-3 {
+  color: #c56a5f;
+}
+.task-priority.priority-2 {
+  color: #b18745;
+}
+.task-priority.priority-1 {
+  color: #739380;
+}
 .task-row-tags {
   display: flex;
   min-width: 0;

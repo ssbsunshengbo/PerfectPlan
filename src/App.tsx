@@ -1726,6 +1726,10 @@ function MainApp() {
   const completedTaskCount = tasks.length - activeTaskCount;
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
+  const projectById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project])),
+    [projects],
+  );
   const taskStatsByProjectId = useMemo(() => {
     const stats = new Map<string, { active: number; completed: number }>();
     tasks.forEach((task) => {
@@ -2981,6 +2985,22 @@ function MainApp() {
               <ul>
                 {tasks.map((task) => {
                   const isCompleted = task.status === "completed";
+                  const project = task.projectId ? projectById.get(task.projectId) : null;
+                  const scheduleLabel = task.scheduledDate
+                    ? task.scheduledStartAt
+                      ? `${formatCalendarDay(task.scheduledDate, false)} ${formatCalendarTime(task.scheduledStartAt)}`
+                      : `${formatCalendarDay(task.scheduledDate, false)} 全天`
+                    : task.dueDate
+                      ? `截止 ${formatCalendarDay(task.dueDate, false)}`
+                      : null;
+                  const priorityLabel =
+                    task.priority === 3
+                      ? "高优先级"
+                      : task.priority === 2
+                        ? "中优先级"
+                        : task.priority === 1
+                          ? "低优先级"
+                          : null;
 
                   return (
                     <li
@@ -3015,6 +3035,33 @@ function MainApp() {
                       >
                         {task.title}
                       </button>
+                      {project || scheduleLabel || priorityLabel ? (
+                        <div aria-label={`${task.title} 的任务信息`} className="task-row-meta">
+                          {project ? (
+                            <button
+                              className="task-project-chip"
+                              onClick={() => void handleProjectFilterChange(project.id)}
+                              style={
+                                { "--project-color": project.color ?? "#98a6b5" } as CSSProperties
+                              }
+                              title={`筛选项目：${project.name}`}
+                              type="button"
+                            >
+                              {project.name}
+                            </button>
+                          ) : null}
+                          {scheduleLabel ? (
+                            <span className={task.dueDate && !task.scheduledDate ? "is-due" : ""}>
+                              {scheduleLabel}
+                            </span>
+                          ) : null}
+                          {priorityLabel ? (
+                            <span className={`task-priority priority-${task.priority}`}>
+                              {priorityLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {(taskTagsById.get(task.id) ?? []).length > 0 ? (
                         <div aria-label={`${task.title} 的标签`} className="task-row-tags">
                           {(taskTagsById.get(task.id) ?? []).map((tag) => (
