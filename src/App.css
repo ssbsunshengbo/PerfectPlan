@@ -2103,6 +2103,7 @@ h1 {
   gap: 4px;
 }
 .project-manage-button {
+  position: relative;
   width: 30px;
   height: 29px;
   border: 1px solid var(--line);
@@ -2114,16 +2115,15 @@ h1 {
   line-height: 0;
 }
 .project-manage-button::after {
-  display: block;
-  width: 3px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
   height: 3px;
-  border-radius: 50%;
-  background: currentcolor;
-  box-shadow:
-    6px 0 currentcolor,
-    12px 0 currentcolor;
+  background: radial-gradient(circle at 1.5px 1.5px, currentcolor 1.5px, transparent 1.6px) 0 0 /
+    6px 3px repeat-x;
   content: "";
-  transform: translateX(-6px);
+  transform: translate(-50%, -50%);
 }
 .project-manage-button:hover {
   border-color: #a4c1b0;
