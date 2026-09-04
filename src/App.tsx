@@ -101,7 +101,7 @@ type CalendarDragPreview = {
   clientX: number;
   clientY: number;
   dropDate: string | null;
-  dropKind: "all-day" | "time" | null;
+  dropKind: "all-day" | "task-pool" | "time" | null;
   dropStartMinutes: number | null;
   task: TaskRecord;
 };
@@ -1258,6 +1258,15 @@ function MainApp() {
     }
   }
 
+  async function returnCalendarTaskToPool(task: TaskRecord) {
+    try {
+      await saveCalendarSchedule(task, { scheduledDate: null, scheduledStartAt: null }, "任务池");
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "移回任务池失败，请重试。");
+      await loadCalendarTasks();
+    }
+  }
+
   function startCalendarTaskDrag(event: PointerEvent<HTMLElement>, task: TaskRecord) {
     if (event.button !== 0) return;
     calendarPointerDragRef.current = {
@@ -1283,17 +1292,22 @@ function MainApp() {
       void scheduleCalendarTask(task, scheduledDate, startMinutes);
     },
   );
+  const returnCalendarPointerDrop = useEffectEvent((task: TaskRecord) => {
+    void returnCalendarTaskToPool(task);
+  });
 
   useEffect(() => {
     if (activeView !== "日历") return;
 
     function getDropTarget(clientX: number, clientY: number) {
       const element = document.elementFromPoint(clientX, clientY);
-      const target = element?.closest<HTMLElement>("[data-calendar-drop-date]");
+      const target = element?.closest<HTMLElement>("[data-calendar-drop-kind]");
       const dropDate = target?.dataset.calendarDropDate ?? null;
       const rawDropKind = target?.dataset.calendarDropKind;
       const dropKind: CalendarDragPreview["dropKind"] =
-        rawDropKind === "time" || rawDropKind === "all-day" ? rawDropKind : null;
+        rawDropKind === "time" || rawDropKind === "all-day" || rawDropKind === "task-pool"
+          ? rawDropKind
+          : null;
       const rawDropStartMinutes = Number(target?.dataset.calendarDropStartMinutes);
       const dropStartMinutes =
         dropKind === "time" && Number.isFinite(rawDropStartMinutes) ? rawDropStartMinutes : null;
@@ -1337,7 +1351,12 @@ function MainApp() {
         event.clientX,
         event.clientY,
       );
-      if (!dropDate || !dropKind || !target) return;
+      if (!dropKind || !target) return;
+      if (dropKind === "task-pool") {
+        returnCalendarPointerDrop(drag.task);
+        return;
+      }
+      if (!dropDate) return;
 
       const startMinutes =
         dropKind === "time"
@@ -1735,7 +1754,7 @@ function MainApp() {
             : 60,
         )
       : null;
-  const calendarBoardMinWidth = calendarViewMode === "week" ? 670 : 360;
+  const calendarBoardMinWidth = calendarViewMode === "week" ? 0 : 360;
 
   function calendarTaskColor(task: TaskRecord): string {
     return projects.find((project) => project.id === task.projectId)?.color ?? "#8bad99";
@@ -2367,7 +2386,7 @@ function MainApp() {
                   <div
                     className="calendar-day-headings"
                     style={{
-                      gridTemplateColumns: `54px repeat(${calendarDates.length}, minmax(88px, 1fr))`,
+                      gridTemplateColumns: `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
                       minWidth: `${calendarBoardMinWidth}px`,
                     }}
                   >
@@ -2406,7 +2425,7 @@ function MainApp() {
                   <div
                     className="calendar-all-day-row"
                     style={{
-                      gridTemplateColumns: `54px repeat(${calendarDates.length}, minmax(88px, 1fr))`,
+                      gridTemplateColumns: `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
                       minWidth: `${calendarBoardMinWidth}px`,
                     }}
                   >
@@ -2458,163 +2477,167 @@ function MainApp() {
 
                   <div
                     className="calendar-time-area"
-                    style={{ minWidth: `${calendarBoardMinWidth}px` }}
+                    style={{
+                      gridTemplateColumns: `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
+                      minWidth: `${calendarBoardMinWidth}px`,
+                    }}
                   >
                     <div className="calendar-time-axis" aria-hidden="true">
                       {calendarHours.map((hour) => (
                         <span key={hour}>{`${String(hour).padStart(2, "0")}:00`}</span>
                       ))}
                     </div>
-                    <div
-                      className="calendar-time-columns"
-                      style={{
-                        gridTemplateColumns: `repeat(${calendarDates.length}, minmax(88px, 1fr))`,
-                      }}
-                    >
-                      {calendarDates.map((date) => {
-                        const timedTasks = calendarTimedTasksByDate.get(date) ?? [];
-                        const timeDropPreview =
-                          calendarDragPreview?.dropDate === date &&
-                          calendarDragPreview.dropKind === "time" &&
-                          calendarDragPreview.dropStartMinutes !== null &&
-                          calendarTimeDropDuration !== null
-                            ? {
-                                duration: calendarTimeDropDuration,
-                                startMinutes: calendarDragPreview.dropStartMinutes,
-                                task: calendarDragPreview.task,
-                              }
-                            : null;
+                    {calendarDates.map((date) => {
+                      const timedTasks = calendarTimedTasksByDate.get(date) ?? [];
+                      const timeDropPreview =
+                        calendarDragPreview?.dropDate === date &&
+                        calendarDragPreview.dropKind === "time" &&
+                        calendarDragPreview.dropStartMinutes !== null &&
+                        calendarTimeDropDuration !== null
+                          ? {
+                              duration: calendarTimeDropDuration,
+                              startMinutes: calendarDragPreview.dropStartMinutes,
+                              task: calendarDragPreview.task,
+                            }
+                          : null;
 
-                        return (
-                          <div
-                            className="calendar-time-column"
-                            data-calendar-drop-date={date}
-                            data-calendar-drop-kind="time"
-                            key={date}
-                          >
-                            {calendarHalfHourSlots.map((startMinutes) => (
+                      return (
+                        <div
+                          className="calendar-time-column"
+                          data-calendar-drop-date={date}
+                          data-calendar-drop-kind="time"
+                          key={date}
+                        >
+                          {calendarHalfHourSlots.map((startMinutes) => (
+                            <div
+                              aria-hidden="true"
+                              className={[
+                                "calendar-time-slot",
+                                startMinutes % 60 === 0 ? "is-hour" : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                              data-calendar-drop-date={date}
+                              data-calendar-drop-kind="time"
+                              data-calendar-drop-start-minutes={startMinutes}
+                              key={startMinutes}
+                              style={{ top: `${startMinutes - 6 * 60}px` }}
+                            />
+                          ))}
+                          {timeDropPreview ? (
+                            <div
+                              aria-hidden="true"
+                              className="calendar-time-drop-shadow"
+                              style={
+                                {
+                                  "--task-color": calendarTaskColor(timeDropPreview.task),
+                                  height: `${timeDropPreview.duration}px`,
+                                  top: `${timeDropPreview.startMinutes - 6 * 60}px`,
+                                } as CSSProperties
+                              }
+                            >
+                              <span>{`${toTimeValue(timeDropPreview.startMinutes)} · ${timeDropPreview.duration} 分钟`}</span>
+                            </div>
+                          ) : null}
+                          {timedTasks.map((task) => {
+                            const estimatedMinutes = task.estimatedMinutes ?? 30;
+                            const offsetMinutes = calendarTimeOffset(task.scheduledStartAt);
+                            const isAfterDue = Boolean(
+                              task.dueDate &&
+                              task.scheduledDate &&
+                              task.scheduledDate > task.dueDate,
+                            );
+                            const isConflict = calendarConflictTaskIds.has(task.id);
+                            const hasTimezoneMismatch = hasCalendarTimezoneMismatch(task);
+                            const isOutsideGrid = isCalendarTimeOutsideGrid(task);
+                            const taskLayout = calendarTaskLayoutsById.get(task.id) ?? {
+                              columnCount: 1,
+                              columnIndex: 0,
+                            };
+                            const displayedMinutes =
+                              calendarResize?.task.id === task.id
+                                ? calendarResize.estimatedMinutes
+                                : estimatedMinutes;
+
+                            return (
                               <div
-                                aria-hidden="true"
                                 className={[
-                                  "calendar-time-slot",
-                                  startMinutes % 60 === 0 ? "is-hour" : "",
+                                  "calendar-time-task",
+                                  isAfterDue ? "is-after-due" : "",
+                                  isConflict ? "is-conflict" : "",
+                                  task.status === "completed" ? "is-completed" : "",
+                                  hasTimezoneMismatch ? "has-timezone-mismatch" : "",
+                                  isOutsideGrid ? "is-outside-grid" : "",
+                                  calendarDragPreview?.task.id === task.id ? "is-dragging" : "",
                                 ]
                                   .filter(Boolean)
                                   .join(" ")}
-                                data-calendar-drop-date={date}
-                                data-calendar-drop-kind="time"
-                                data-calendar-drop-start-minutes={startMinutes}
-                                key={startMinutes}
-                                style={{ top: `${startMinutes - 6 * 60}px` }}
-                              />
-                            ))}
-                            {timeDropPreview ? (
-                              <div
-                                aria-hidden="true"
-                                className="calendar-time-drop-shadow"
+                                key={task.id}
                                 style={
                                   {
-                                    "--task-color": calendarTaskColor(timeDropPreview.task),
-                                    height: `${timeDropPreview.duration}px`,
-                                    top: `${timeDropPreview.startMinutes - 6 * 60}px`,
+                                    "--task-color": calendarTaskColor(task),
+                                    height: `${Math.max(displayedMinutes, 30)}px`,
+                                    left: `${5 + (90 * taskLayout.columnIndex) / taskLayout.columnCount}%`,
+                                    top: `${offsetMinutes}px`,
+                                    width: `${90 / taskLayout.columnCount}%`,
                                   } as CSSProperties
                                 }
                               >
-                                <span>{`${toTimeValue(timeDropPreview.startMinutes)} · ${timeDropPreview.duration} 分钟`}</span>
-                              </div>
-                            ) : null}
-                            {timedTasks.map((task) => {
-                              const estimatedMinutes = task.estimatedMinutes ?? 30;
-                              const offsetMinutes = calendarTimeOffset(task.scheduledStartAt);
-                              const isAfterDue = Boolean(
-                                task.dueDate &&
-                                task.scheduledDate &&
-                                task.scheduledDate > task.dueDate,
-                              );
-                              const isConflict = calendarConflictTaskIds.has(task.id);
-                              const hasTimezoneMismatch = hasCalendarTimezoneMismatch(task);
-                              const isOutsideGrid = isCalendarTimeOutsideGrid(task);
-                              const taskLayout = calendarTaskLayoutsById.get(task.id) ?? {
-                                columnCount: 1,
-                                columnIndex: 0,
-                              };
-                              const displayedMinutes =
-                                calendarResize?.task.id === task.id
-                                  ? calendarResize.estimatedMinutes
-                                  : estimatedMinutes;
-
-                              return (
-                                <div
-                                  className={[
-                                    "calendar-time-task",
-                                    isAfterDue ? "is-after-due" : "",
-                                    isConflict ? "is-conflict" : "",
-                                    task.status === "completed" ? "is-completed" : "",
-                                    hasTimezoneMismatch ? "has-timezone-mismatch" : "",
-                                    isOutsideGrid ? "is-outside-grid" : "",
-                                    calendarDragPreview?.task.id === task.id ? "is-dragging" : "",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                  key={task.id}
-                                  style={
-                                    {
-                                      "--task-color": calendarTaskColor(task),
-                                      height: `${Math.max(displayedMinutes, 30)}px`,
-                                      left: `${5 + (90 * taskLayout.columnIndex) / taskLayout.columnCount}%`,
-                                      top: `${offsetMinutes}px`,
-                                      width: `${90 / taskLayout.columnCount}%`,
-                                    } as CSSProperties
-                                  }
+                                <button
+                                  aria-keyshortcuts="A"
+                                  aria-label={`${formatCalendarTime(task.scheduledStartAt)}，${task.title}；按 A 可安排到其他时间`}
+                                  className="calendar-time-task-main"
+                                  onClick={(event) => handleCalendarTaskClick(event, task)}
+                                  onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
+                                  onPointerDown={(event) => startCalendarTaskDrag(event, task)}
+                                  type="button"
                                 >
-                                  <button
-                                    aria-keyshortcuts="A"
-                                    aria-label={`${formatCalendarTime(task.scheduledStartAt)}，${task.title}；按 A 可安排到其他时间`}
-                                    className="calendar-time-task-main"
-                                    onClick={(event) => handleCalendarTaskClick(event, task)}
-                                    onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
-                                    onPointerDown={(event) => startCalendarTaskDrag(event, task)}
-                                    type="button"
-                                  >
-                                    <span>{formatCalendarTime(task.scheduledStartAt)}</span>
-                                    <strong>{task.title}</strong>
-                                    <small>
-                                      {`${task.status === "completed" ? "✓ 已完成 · " : ""}${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
-                                    </small>
-                                  </button>
-                                  {calendarResize?.task.id === task.id ? (
-                                    <span className="calendar-resize-duration">
-                                      {displayedMinutes} 分钟
-                                    </span>
-                                  ) : null}
-                                  <button
-                                    aria-label={`上下拖动以调整「${task.title}」的时长`}
-                                    className="calendar-resize-handle"
-                                    onPointerCancel={() => setCalendarResize(null)}
-                                    onPointerDown={(event) => startCalendarResize(event, task)}
-                                    onPointerMove={updateCalendarResize}
-                                    onPointerUp={endCalendarResize}
-                                    title="上下拖动调整时长（每格 30 分钟）"
-                                    type="button"
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
+                                  <span>{formatCalendarTime(task.scheduledStartAt)}</span>
+                                  <strong>{task.title}</strong>
+                                  <small>
+                                    {`${task.status === "completed" ? "✓ 已完成 · " : ""}${displayedMinutes} 分钟${isAfterDue ? " · 晚于截止日" : ""}${isConflict ? " · 时间冲突" : ""}${hasTimezoneMismatch ? " · 时区已变" : ""}${isOutsideGrid ? " · 超出日程范围" : ""}`}
+                                  </small>
+                                </button>
+                                {calendarResize?.task.id === task.id ? (
+                                  <span className="calendar-resize-duration">
+                                    {displayedMinutes} 分钟
+                                  </span>
+                                ) : null}
+                                <button
+                                  aria-label={`上下拖动以调整「${task.title}」的时长`}
+                                  className="calendar-resize-handle"
+                                  onPointerCancel={() => setCalendarResize(null)}
+                                  onPointerDown={(event) => startCalendarResize(event, task)}
+                                  onPointerMove={updateCalendarResize}
+                                  onPointerUp={endCalendarResize}
+                                  title="上下拖动调整时长（每格 30 分钟）"
+                                  type="button"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              <aside aria-labelledby="calendar-candidates-title" className="calendar-candidates">
+              <aside
+                aria-labelledby="calendar-candidates-title"
+                className={
+                  calendarDragPreview?.dropKind === "task-pool"
+                    ? "calendar-candidates is-calendar-drop-target"
+                    : "calendar-candidates"
+                }
+                data-calendar-drop-kind="task-pool"
+              >
                 <div className="calendar-candidates-heading">
                   <p className="eyebrow">
                     待安排 <span>{calendarCandidateTasks.length}</span>
                   </p>
                   <h3 id="calendar-candidates-title">任务池</h3>
-                  <p>拖到日期安排全天，拖到时间网格安排具体时间；按 A 也可键盘安排。</p>
+                  <p>拖到日期安排全天，拖到时间网格安排具体时间；拖回这里取消排期。</p>
                 </div>
                 {calendarCandidateTasks.length > 0 ? (
                   <ul>
@@ -2664,7 +2687,13 @@ function MainApp() {
                     } as CSSProperties
                   }
                 >
-                  <span>{calendarDragPreview.dropDate ? "安排到此处" : "拖到日期或时间格"}</span>
+                  <span>
+                    {calendarDragPreview.dropKind === "task-pool"
+                      ? "移回任务池"
+                      : calendarDragPreview.dropDate
+                        ? "安排到此处"
+                        : "拖到日期、时间格或任务池"}
+                  </span>
                   <strong>{calendarDragPreview.task.title}</strong>
                 </div>
               ) : null}
