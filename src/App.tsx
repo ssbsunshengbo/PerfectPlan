@@ -2382,14 +2382,16 @@ function MainApp() {
                   </div>
                 </div>
               ) : (
-                <div className="calendar-board">
-                  <div
-                    className="calendar-day-headings"
-                    style={{
-                      gridTemplateColumns: `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
+                <div
+                  className="calendar-board"
+                  style={
+                    {
+                      "--calendar-grid-columns": `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
                       minWidth: `${calendarBoardMinWidth}px`,
-                    }}
-                  >
+                    } as CSSProperties
+                  }
+                >
+                  <div className="calendar-day-headings">
                     <span />
                     {calendarDates.map((date) => {
                       const isTodayDate = date === toLocalDateValue();
@@ -2422,13 +2424,7 @@ function MainApp() {
                     })}
                   </div>
 
-                  <div
-                    className="calendar-all-day-row"
-                    style={{
-                      gridTemplateColumns: `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
-                      minWidth: `${calendarBoardMinWidth}px`,
-                    }}
-                  >
+                  <div className="calendar-all-day-row">
                     <span className="calendar-all-day-label">全天</span>
                     {calendarDates.map((date) => {
                       const allDayTasks = calendarAllDayTasksByDate.get(date) ?? [];
@@ -2475,13 +2471,7 @@ function MainApp() {
                     })}
                   </div>
 
-                  <div
-                    className="calendar-time-area"
-                    style={{
-                      gridTemplateColumns: `48px repeat(${calendarDates.length}, minmax(0, 1fr))`,
-                      minWidth: `${calendarBoardMinWidth}px`,
-                    }}
-                  >
+                  <div className="calendar-time-area">
                     <div className="calendar-time-axis" aria-hidden="true">
                       {calendarHours.map((hour) => (
                         <span key={hour}>{`${String(hour).padStart(2, "0")}:00`}</span>

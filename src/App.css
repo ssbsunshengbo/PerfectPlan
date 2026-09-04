@@ -1138,6 +1138,8 @@ h1 {
   gap: 15px;
 }
 .calendar-board {
+  display: grid;
+  grid-template-columns: var(--calendar-grid-columns);
   min-width: 0;
   overflow: auto;
   border: 1px solid var(--line);
@@ -1255,8 +1257,11 @@ h1 {
   white-space: nowrap;
 }
 .calendar-day-headings,
-.calendar-all-day-row {
+.calendar-all-day-row,
+.calendar-time-area {
   display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
 }
 .calendar-day-headings {
   position: sticky;
@@ -1355,9 +1360,6 @@ h1 {
 .calendar-candidate-task:hover {
   border-color: var(--task-color);
   background: color-mix(in srgb, var(--task-color) 16%, var(--panel));
-}
-.calendar-time-area {
-  display: grid;
 }
 .calendar-time-axis {
   display: grid;
