@@ -1268,8 +1268,34 @@ function MainApp() {
   }
 
   async function returnCalendarTaskToPool(task: TaskRecord) {
+    const previousSchedule = {
+      estimatedMinutes: task.estimatedMinutes,
+      scheduledDate: task.scheduledDate,
+      scheduledStartAt: task.scheduledStartAt,
+    };
+
+    setTaskError(null);
     try {
-      await saveCalendarSchedule(task, { scheduledDate: null, scheduledStartAt: null }, "任务池");
+      const returnedTask = await taskService.updateTask(task.id, {
+        scheduledDate: null,
+        scheduledStartAt: null,
+      });
+      setCalendarTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === returnedTask.id ? returnedTask : currentTask,
+        ),
+      );
+      setTasks((currentTasks) =>
+        currentTasks.map((currentTask) =>
+          currentTask.id === returnedTask.id ? returnedTask : currentTask,
+        ),
+      );
+      setLastTaskAction({
+        kind: "rescheduled",
+        previousSchedule,
+        rescheduleLabel: "任务池",
+        task: { id: task.id, title: task.title },
+      });
       await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "移回任务池失败，请重试。");
@@ -1788,10 +1814,10 @@ function MainApp() {
   const calendarCandidateTasks = [...calendarTasks]
     .filter(
       (task) =>
-        task.status === "active" &&
-        (!task.scheduledDate ||
-          calendarFocusTasks.some((focusTask) => focusTask.id === task.id) ||
-          calendarOverdueTasks.some((overdueTask) => overdueTask.id === task.id)),
+        !task.scheduledDate ||
+        (task.status === "active" &&
+          (calendarFocusTasks.some((focusTask) => focusTask.id === task.id) ||
+            calendarOverdueTasks.some((overdueTask) => overdueTask.id === task.id))),
     )
     .sort((left, right) => {
       const sourceRank = (task: TaskRecord) =>
@@ -2706,15 +2732,31 @@ function MainApp() {
                         <li key={task.id}>
                           <button
                             aria-keyshortcuts="A"
-                            className="calendar-candidate-task"
+                            className={
+                              task.status === "completed"
+                                ? "calendar-candidate-task is-completed"
+                                : "calendar-candidate-task"
+                            }
                             onClick={(event) => handleCalendarTaskClick(event, task)}
                             onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
-                            onPointerDown={(event) => startCalendarTaskDrag(event, task)}
+                            onPointerDown={(event) => {
+                              if (task.status === "active") startCalendarTaskDrag(event, task);
+                            }}
                             style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                             type="button"
                           >
-                            <strong>{task.title}</strong>
-                            <span>{isOverdue ? "已逾期" : isFocus ? "今日重点" : "未安排"}</span>
+                            <strong>
+                              {task.status === "completed" ? `✓ ${task.title}` : task.title}
+                            </strong>
+                            <span>
+                              {task.status === "completed"
+                                ? "已完成"
+                                : isOverdue
+                                  ? "已逾期"
+                                  : isFocus
+                                    ? "今日重点"
+                                    : "未安排"}
+                            </span>
                           </button>
                         </li>
                       );

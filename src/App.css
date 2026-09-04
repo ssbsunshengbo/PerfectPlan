@@ -1358,6 +1358,17 @@ h1 {
   border-color: var(--task-color);
   background: color-mix(in srgb, var(--task-color) 16%, var(--panel));
 }
+.calendar-candidate-task.is-completed {
+  border-color: #aeb9b2;
+  border-left-color: #7f9a89;
+  background: #edf3ee;
+  color: #718077;
+  filter: saturate(0.45);
+}
+.calendar-candidate-task.is-completed strong,
+.calendar-candidate-task.is-completed span {
+  color: #718077;
+}
 .calendar-time-axis {
   display: grid;
   grid-template-rows: repeat(18, 60px);
