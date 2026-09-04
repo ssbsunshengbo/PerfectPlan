@@ -50,6 +50,15 @@ textarea:focus-visible {
   outline: 3px solid #5c8df0;
   outline-offset: 3px;
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 .app-shell {
   display: grid;
@@ -538,7 +547,7 @@ h1 {
 .task-filter-controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: center;
   gap: 10px;
   border-bottom: 1px solid var(--line);
   background: rgb(247 249 245 / 72%);
@@ -575,6 +584,148 @@ h1 {
 }
 .search-field input {
   min-height: 36px;
+}
+.task-filter-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.task-filter-trigger {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #cad7ce;
+  border-radius: 9px;
+  background: #fff;
+  padding: 7px 10px 7px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.task-filter-trigger:hover,
+.task-filter-trigger[aria-expanded="true"] {
+  border-color: #91af9f;
+  background: #f5faf7;
+  color: var(--accent-deep);
+}
+.task-filter-trigger.has-active-filters {
+  border-color: #9ccbb4;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+.task-filter-trigger span {
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1;
+}
+.task-filter-trigger i {
+  color: var(--faint);
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+.task-filter-popover {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(356px, calc(100vw - 48px));
+  max-height: min(500px, calc(100vh - 110px));
+  overflow-y: auto;
+  border: 1px solid #dbe4dd;
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 12px 28px rgb(32 57 43 / 14%);
+  padding: 14px;
+}
+.task-filter-popover section + section {
+  margin-top: 13px;
+  border-top: 1px solid var(--line);
+  padding-top: 13px;
+}
+.task-filter-popover p {
+  margin: 0 0 8px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.035em;
+}
+.task-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.task-filter-options button,
+.active-filter-summary button {
+  border: 1px solid #d5ded8;
+  border-radius: 999px;
+  background: #fff;
+  padding: 5px 9px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.task-filter-options button:hover,
+.active-filter-summary button:hover {
+  border-color: #9ccbb4;
+  background: #f4faf6;
+  color: var(--accent-deep);
+}
+.task-filter-options button.is-selected {
+  border-color: #9ccbb4;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 760;
+}
+.task-filter-options button[style] {
+  border-color: color-mix(in srgb, var(--tag-color) 35%, #d7ded9);
+  background: color-mix(in srgb, var(--tag-color) 8%, #fff);
+  color: color-mix(in srgb, var(--tag-color) 74%, #26352d);
+}
+.task-filter-options button[style].is-selected,
+.active-filter-summary button[style] {
+  border-color: color-mix(in srgb, var(--tag-color) 62%, #d7ded9);
+  background: color-mix(in srgb, var(--tag-color) 17%, #fff);
+}
+.task-filter-clear {
+  margin-top: 15px;
+  border: 0;
+  background: transparent;
+  padding: 4px 1px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.task-filter-clear:hover {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.active-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  border-bottom: 1px solid var(--line);
+  background: rgb(247 249 245 / 45%);
+  padding: 9px 24px 11px;
 }
 .compact-filter select:focus,
 .search-field input:focus,
@@ -3151,7 +3302,7 @@ h1 {
     font-size: 35px;
   }
   .task-filter-controls,
-  .tag-filter-bar,
+  .active-filter-summary,
   .task-list-heading,
   .task-row,
   .project-list li {
@@ -3212,14 +3363,25 @@ h1 {
     background: rgb(32 44 39 / 90%);
   }
   .task-filter-controls,
+  .active-filter-summary,
   .archived-projects {
     background: rgb(19 28 24 / 44%);
+  }
+  .task-filter-popover {
+    border-color: #42564a;
+    box-shadow: 0 14px 30px rgb(0 0 0 / 28%);
+  }
+  .task-filter-options button[style] {
+    color: color-mix(in srgb, var(--tag-color) 58%, #eaf4ed);
   }
   .task-row:hover {
     background: rgb(105 171 134 / 8%);
   }
   .compact-filter select,
   .search-field input,
+  .task-filter-trigger,
+  .task-filter-options button,
+  .active-filter-summary button,
   .quick-add-dialog input,
   .task-details-form input,
   .task-details-form textarea,

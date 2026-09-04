@@ -59,6 +59,13 @@ type DatabaseState = "loading" | "ready" | "error";
 const navigationItems = ["任务", "日历", "项目", "回收站"] as const;
 /* Kept temporarily for the desktop-only daily-plan cleanup; it is no longer navigable. */
 type NavigationItem = "今日" | (typeof navigationItems)[number];
+const priorityFilterOptions: Array<{ label: string; value: "all" | TaskPriority }> = [
+  { label: "全部优先级", value: "all" },
+  { label: "无优先级", value: 0 },
+  { label: "低优先级", value: 1 },
+  { label: "中优先级", value: 2 },
+  { label: "高优先级", value: 3 },
+];
 type ReversibleTaskAction = {
   kind: "created" | "completed" | "rescheduled" | "trashed";
   nextRecurringTaskId?: string | null;
@@ -365,6 +372,7 @@ function MainApp() {
   const [searchInputValue, setSearchInputValue] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | TaskPriority>("all");
+  const [isTaskFiltersOpen, setIsTaskFiltersOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
@@ -1696,6 +1704,18 @@ function MainApp() {
   const hasInboxFilters = Boolean(
     activeTagId || searchQuery || projectFilter !== "all" || priorityFilter !== "all",
   );
+  const activeProjectFilter = projects.find((project) => project.id === projectFilter) ?? null;
+  const activeTagFilter = tags.find((tag) => tag.id === activeTagId) ?? null;
+  const activePriorityFilter = priorityFilterOptions.find(
+    (option) => option.value === priorityFilter,
+  );
+  const activeStructuredFilterCount = [
+    activeTagId,
+    projectFilter !== "all",
+    priorityFilter !== "all",
+  ].filter(Boolean).length;
+  const activeTaskCount = tasks.filter((task) => task.status === "active").length;
+  const completedTaskCount = tasks.length - activeTaskCount;
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
   const taskStatsByProjectId = useMemo(() => {
@@ -2811,17 +2831,17 @@ function MainApp() {
           <section className="task-list" aria-labelledby="task-list-title">
             <div className="task-list-heading">
               <div>
-                <h2 id="task-list-title">待完成</h2>
+                <h2 id="task-list-title">任务</h2>
                 <p>
                   {hasInboxFilters
                     ? `找到 ${tasks.length} 条任务`
-                    : `${tasks.length} 条任务保存在此设备`}
+                    : `${activeTaskCount} 条待办 · ${completedTaskCount} 条已完成`}
                 </p>
               </div>
             </div>
             <div className="task-filter-controls">
               <label className="search-field" htmlFor="task-search">
-                <span>搜索任务</span>
+                <span className="visually-hidden">搜索任务</span>
                 <input
                   id="task-search"
                   onChange={(event) => {
@@ -2838,78 +2858,150 @@ function MainApp() {
                   onCompositionStart={() => {
                     isSearchComposingRef.current = true;
                   }}
-                  placeholder="搜索标题和备注"
+                  placeholder="搜索任务、备注…"
                   ref={searchInputRef}
                   type="search"
                   value={searchInputValue}
                 />
               </label>
-              <label className="compact-filter" htmlFor="project-filter">
-                <span>项目</span>
-                <select
-                  id="project-filter"
-                  onChange={(event) => void handleProjectFilterChange(event.target.value)}
-                  value={projectFilter}
-                >
-                  <option value="all">全部项目</option>
-                  <option value="">未归属项目</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.status === "archived" ? `${project.name}（已归档）` : project.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="compact-filter" htmlFor="priority-filter">
-                <span>优先级</span>
-                <select
-                  id="priority-filter"
-                  onChange={(event) =>
-                    void handlePriorityFilterChange(
-                      event.target.value === "all"
-                        ? "all"
-                        : (Number(event.target.value) as TaskPriority),
-                    )
+              <div className="task-filter-menu">
+                <button
+                  aria-expanded={isTaskFiltersOpen}
+                  aria-haspopup="dialog"
+                  className={
+                    activeStructuredFilterCount > 0
+                      ? "task-filter-trigger has-active-filters"
+                      : "task-filter-trigger"
                   }
-                  value={priorityFilter}
-                >
-                  <option value="all">全部优先级</option>
-                  <option value="0">无优先级</option>
-                  <option value="1">低优先级</option>
-                  <option value="2">中优先级</option>
-                  <option value="3">高优先级</option>
-                </select>
-              </label>
-              {hasInboxFilters ? (
-                <button
-                  className="text-button"
-                  onClick={() => void handleClearInboxFilters()}
+                  onClick={() => setIsTaskFiltersOpen((current) => !current)}
                   type="button"
                 >
-                  清除筛选
+                  筛选
+                  {activeStructuredFilterCount > 0 ? (
+                    <span>{activeStructuredFilterCount}</span>
+                  ) : null}
+                  <i aria-hidden="true">⌄</i>
                 </button>
-              ) : null}
+                {isTaskFiltersOpen ? (
+                  <div
+                    aria-label="筛选任务"
+                    className="task-filter-popover"
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setIsTaskFiltersOpen(false);
+                      }
+                    }}
+                    role="dialog"
+                  >
+                    <section>
+                      <p>项目</p>
+                      <div className="task-filter-options">
+                        <button
+                          aria-pressed={projectFilter === "all"}
+                          className={projectFilter === "all" ? "is-selected" : ""}
+                          onClick={() => void handleProjectFilterChange("all")}
+                          type="button"
+                        >
+                          全部项目
+                        </button>
+                        <button
+                          aria-pressed={projectFilter === ""}
+                          className={projectFilter === "" ? "is-selected" : ""}
+                          onClick={() => void handleProjectFilterChange("")}
+                          type="button"
+                        >
+                          未归属项目
+                        </button>
+                        {projects.map((project) => (
+                          <button
+                            aria-pressed={projectFilter === project.id}
+                            className={projectFilter === project.id ? "is-selected" : ""}
+                            key={project.id}
+                            onClick={() => void handleProjectFilterChange(project.id)}
+                            type="button"
+                          >
+                            {project.name}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                    <section>
+                      <p>优先级</p>
+                      <div className="task-filter-options">
+                        {priorityFilterOptions.map((option) => (
+                          <button
+                            aria-pressed={priorityFilter === option.value}
+                            className={priorityFilter === option.value ? "is-selected" : ""}
+                            key={String(option.value)}
+                            onClick={() => void handlePriorityFilterChange(option.value)}
+                            type="button"
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                    {tags.length > 0 ? (
+                      <section>
+                        <p>标签</p>
+                        <div className="task-filter-options">
+                          <button
+                            aria-pressed={!activeTagId}
+                            className={!activeTagId ? "is-selected" : ""}
+                            onClick={() => void handleTagFilter(null)}
+                            type="button"
+                          >
+                            全部标签
+                          </button>
+                          {tags.map((tag) => (
+                            <button
+                              aria-pressed={activeTagId === tag.id}
+                              className={activeTagId === tag.id ? "is-selected" : ""}
+                              key={tag.id}
+                              onClick={() => void handleTagFilter(tag.id)}
+                              style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
+                              type="button"
+                            >
+                              {tag.name}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+                    {activeStructuredFilterCount > 0 ? (
+                      <button
+                        className="task-filter-clear"
+                        onClick={() => void handleClearInboxFilters()}
+                        type="button"
+                      >
+                        清除全部筛选
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </div>
-            {tags.length > 0 ? (
-              <div aria-label="按标签筛选" className="tag-filter-bar">
-                <button
-                  className={!activeTagId ? "tag-chip is-selected" : "tag-chip"}
-                  onClick={() => void handleTagFilter(null)}
-                  type="button"
-                >
-                  全部
-                </button>
-                {tags.map((tag) => (
+            {activeStructuredFilterCount > 0 ? (
+              <div aria-label="当前筛选条件" className="active-filter-summary">
+                {projectFilter !== "all" ? (
+                  <button onClick={() => void handleProjectFilterChange("all")} type="button">
+                    {activeProjectFilter?.name ?? "未归属项目"} ×
+                  </button>
+                ) : null}
+                {priorityFilter !== "all" ? (
+                  <button onClick={() => void handlePriorityFilterChange("all")} type="button">
+                    {activePriorityFilter?.label} ×
+                  </button>
+                ) : null}
+                {activeTagFilter ? (
                   <button
-                    className={activeTagId === tag.id ? "tag-chip is-selected" : "tag-chip"}
-                    key={tag.id}
-                    onClick={() => void handleTagFilter(tag.id)}
-                    style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
+                    onClick={() => void handleTagFilter(null)}
+                    style={{ "--tag-color": getDisplayTagColor(activeTagFilter) } as CSSProperties}
                     type="button"
                   >
-                    {tag.name}
+                    {activeTagFilter.name} ×
                   </button>
-                ))}
+                ) : null}
               </div>
             ) : null}
             {tasks.length > 0 ? (
