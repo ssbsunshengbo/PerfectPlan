@@ -3017,67 +3017,77 @@ function MainApp() {
                         onClick={() => void handleCompleteTask(task)}
                         type="button"
                       />
-                      <button
-                        aria-keyshortcuts="Enter Space Delete Backspace"
-                        className="task-title"
-                        onClick={() => void openTaskDetails(task)}
-                        onKeyDown={(event) => {
-                          if (event.key === " " && !isCompleted) {
-                            event.preventDefault();
-                            void handleCompleteTask(task);
-                          }
-                          if (event.key === "Delete" || event.key === "Backspace") {
-                            event.preventDefault();
-                            requestTrashTask(task);
-                          }
-                        }}
-                        type="button"
-                      >
-                        {task.title}
-                      </button>
-                      {project || scheduleLabel || priorityLabel ? (
-                        <div aria-label={`${task.title} 的任务信息`} className="task-row-meta">
+                      <div className="task-row-body">
+                        <button
+                          aria-keyshortcuts="Enter Space Delete Backspace"
+                          className="task-title"
+                          onClick={() => void openTaskDetails(task)}
+                          onKeyDown={(event) => {
+                            if (event.key === " " && !isCompleted) {
+                              event.preventDefault();
+                              void handleCompleteTask(task);
+                            }
+                            if (event.key === "Delete" || event.key === "Backspace") {
+                              event.preventDefault();
+                              requestTrashTask(task);
+                            }
+                          }}
+                          type="button"
+                        >
+                          {task.title}
+                        </button>
+                        <div aria-label={`${task.title} 的任务信息`} className="task-row-info">
                           {project ? (
-                            <button
-                              className="task-project-chip"
-                              onClick={() => void handleProjectFilterChange(project.id)}
-                              style={
-                                { "--project-color": project.color ?? "#98a6b5" } as CSSProperties
-                              }
-                              title={`筛选项目：${project.name}`}
-                              type="button"
-                            >
-                              {project.name}
-                            </button>
-                          ) : null}
+                            <span className="task-info-project">
+                              <button
+                                className="task-project-chip"
+                                onClick={() => void handleProjectFilterChange(project.id)}
+                                style={
+                                  { "--project-color": project.color ?? "#98a6b5" } as CSSProperties
+                                }
+                                title={`筛选项目：${project.name}`}
+                                type="button"
+                              >
+                                {project.name}
+                              </button>
+                            </span>
+                          ) : (
+                            <span />
+                          )}
                           {scheduleLabel ? (
-                            <span className={task.dueDate && !task.scheduledDate ? "is-due" : ""}>
+                            <span
+                              className={`task-info-schedule ${task.dueDate && !task.scheduledDate ? "is-due" : ""}`}
+                            >
                               {scheduleLabel}
                             </span>
-                          ) : null}
+                          ) : (
+                            <span />
+                          )}
                           {priorityLabel ? (
-                            <span className={`task-priority priority-${task.priority}`}>
+                            <span
+                              className={`task-priority priority-${task.priority} task-info-priority`}
+                            >
                               {priorityLabel}
                             </span>
-                          ) : null}
+                          ) : (
+                            <span />
+                          )}
+                          <div aria-label={`${task.title} 的标签`} className="task-row-tags">
+                            {(taskTagsById.get(task.id) ?? []).map((tag) => (
+                              <button
+                                className="task-tag"
+                                key={tag.id}
+                                onClick={() => void handleTagFilter(tag.id)}
+                                style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
+                                title={`筛选标签：${tag.name}`}
+                                type="button"
+                              >
+                                {tag.name}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      ) : null}
-                      {(taskTagsById.get(task.id) ?? []).length > 0 ? (
-                        <div aria-label={`${task.title} 的标签`} className="task-row-tags">
-                          {(taskTagsById.get(task.id) ?? []).map((tag) => (
-                            <button
-                              className="task-tag"
-                              key={tag.id}
-                              onClick={() => void handleTagFilter(tag.id)}
-                              style={{ "--tag-color": getDisplayTagColor(tag) } as CSSProperties}
-                              title={`筛选标签：${tag.name}`}
-                              type="button"
-                            >
-                              {tag.name}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
+                      </div>
                       <button
                         aria-label={`删除任务：${task.title}`}
                         className="task-delete-button"

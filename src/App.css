@@ -789,7 +789,7 @@ h1 {
 }
 .task-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 12px;
   min-height: 64px;
@@ -860,7 +860,7 @@ h1 {
 }
 .task-title {
   min-width: 0;
-  flex: 1 1 240px;
+  width: 100%;
   border: 0;
   background: transparent;
   padding: 0;
@@ -876,22 +876,30 @@ h1 {
 .task-title:hover {
   color: var(--accent-deep);
 }
-.task-row-meta {
-  display: flex;
+.task-row-body {
+  display: grid;
   min-width: 0;
-  flex: 0 1 auto;
-  align-items: center;
+  flex: 1 1 320px;
   gap: 6px;
+  padding: 1px 0;
+}
+.task-row-info {
+  display: grid;
+  grid-template-columns: minmax(0, 118px) minmax(0, 135px) minmax(0, 82px) minmax(0, 1fr);
+  min-width: 0;
+  align-items: center;
+  column-gap: 8px;
   color: var(--faint);
   font-size: 11px;
   font-weight: 620;
-  white-space: nowrap;
 }
-.task-row-meta > span {
+.task-row-info > span,
+.task-row-info > div {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.task-row-meta > span.is-due {
+.task-info-schedule.is-due {
   color: #ad6639;
 }
 .task-project-chip {
@@ -935,7 +943,6 @@ h1 {
 .task-row-tags {
   display: flex;
   min-width: 0;
-  flex: 0 1 220px;
   gap: 6px;
   overflow: hidden;
 }
