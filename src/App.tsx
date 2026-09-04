@@ -1261,6 +1261,7 @@ function MainApp() {
   async function returnCalendarTaskToPool(task: TaskRecord) {
     try {
       await saveCalendarSchedule(task, { scheduledDate: null, scheduledStartAt: null }, "任务池");
+      await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "移回任务池失败，请重试。");
       await loadCalendarTasks();
@@ -1323,6 +1324,16 @@ function MainApp() {
         drag.hasMoved = true;
         document.body.style.userSelect = "none";
       }
+
+      const edgeSize = 72;
+      const distanceToBottom = window.innerHeight - event.clientY;
+      const scrollDistance =
+        event.clientY < edgeSize
+          ? -Math.ceil((edgeSize - event.clientY) / 6)
+          : distanceToBottom < edgeSize
+            ? Math.ceil((edgeSize - distanceToBottom) / 6)
+            : 0;
+      if (scrollDistance !== 0) window.scrollBy(0, scrollDistance);
 
       const { dropDate, dropKind, dropStartMinutes } = getDropTarget(event.clientX, event.clientY);
       setCalendarDragPreview({

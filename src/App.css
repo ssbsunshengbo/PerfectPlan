@@ -1563,6 +1563,26 @@ h1 {
   background-color: rgb(43 115 89 / 9%);
   box-shadow: inset 0 0 0 2px rgb(43 115 89 / 45%);
 }
+.calendar-candidates.is-calendar-drop-target {
+  position: relative;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(43 115 89 / 18%);
+}
+.calendar-candidates.is-calendar-drop-target::after {
+  position: absolute;
+  z-index: 6;
+  inset: 8px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed color-mix(in srgb, var(--accent) 72%, #fff);
+  border-radius: 12px;
+  background: rgb(235 247 239 / 94%);
+  color: var(--accent-deep);
+  content: "松开以移回任务池";
+  font-size: 12px;
+  font-weight: 760;
+  pointer-events: none;
+}
 .calendar-drag-preview {
   position: fixed;
   z-index: 50;
