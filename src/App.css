@@ -1991,6 +1991,26 @@ h1 {
   padding: 15px 24px;
   font-size: 14px;
 }
+.project-list .project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  padding: 14px;
+}
+.project-list .project-grid .project-row {
+  position: relative;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid #dce4df;
+  border-radius: 14px;
+  background: #fff;
+  padding: 0;
+}
+.project-list .project-grid .project-row:hover,
+.project-list .project-grid .project-row:focus-within {
+  border-color: #aac8b8;
+  box-shadow: 0 7px 18px rgb(38 81 60 / 8%);
+}
 .project-row {
   display: flex;
   align-items: center;
@@ -2012,6 +2032,52 @@ h1 {
   flex: 1;
   gap: 4px;
 }
+.project-list .project-grid .project-summary-button {
+  min-height: 148px;
+  align-content: start;
+  gap: 8px;
+  padding: 18px;
+  padding-right: 106px;
+}
+.project-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+.project-summary .project-identity strong {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+}
+.project-summary .project-stats {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 580;
+}
+.project-next-task {
+  display: grid;
+  gap: 3px;
+  margin-top: 3px;
+  border-top: 1px solid rgb(220 228 223 / 78%);
+  padding-top: 10px;
+}
+.project-next-task small {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.project-next-task em {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .project-summary strong {
   overflow: hidden;
   font-weight: 700;
@@ -2030,6 +2096,12 @@ h1 {
   align-items: center;
   gap: 6px;
 }
+.project-list .project-grid .project-actions {
+  position: absolute;
+  top: 14px;
+  right: 13px;
+  gap: 4px;
+}
 .project-action-button {
   display: grid;
   width: 29px;
@@ -2041,6 +2113,25 @@ h1 {
   color: var(--muted);
 }
 .project-action-button:hover:not(:disabled) {
+  color: var(--accent-deep);
+}
+.project-manage-button {
+  display: grid;
+  width: 30px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.project-manage-button:hover {
+  border-color: #a4c1b0;
+  background: #eff7f2;
   color: var(--accent-deep);
 }
 .archived-projects {
@@ -3253,6 +3344,13 @@ h1 {
   .project-list li {
     padding-inline: 16px;
   }
+  .project-list .project-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  .project-list .project-grid .project-row {
+    padding-inline: 0;
+  }
   .today-task-row {
     flex-wrap: wrap;
   }
@@ -3318,6 +3416,14 @@ h1 {
   }
   .task-filter-options button[style] {
     color: color-mix(in srgb, var(--tag-color) 58%, #eaf4ed);
+  }
+  .project-list .project-grid .project-row,
+  .project-manage-button {
+    border-color: #42564a;
+    background: #26342e;
+  }
+  .project-next-task {
+    border-color: #3b4c42;
   }
   .task-row:hover {
     background: rgb(105 171 134 / 8%);

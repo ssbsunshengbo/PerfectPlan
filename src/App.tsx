@@ -1628,6 +1628,16 @@ function MainApp() {
     });
     return stats;
   }, [tasks]);
+  const nextTaskByProjectId = useMemo(() => {
+    const nextTasks = new Map<string, TaskRecord>();
+
+    tasks.forEach((task) => {
+      if (task.status !== "active" || !task.projectId || nextTasks.has(task.projectId)) return;
+      nextTasks.set(task.projectId, task);
+    });
+
+    return nextTasks;
+  }, [tasks]);
   const todayFocusTaskIds = new Set(todayFocusTasks.map((task) => task.id));
   const todayOtherTaskIds = new Set([
     ...todayCarryoverSuggestions.map((task) => task.id),
@@ -2956,7 +2966,7 @@ function MainApp() {
             <div className="task-list-heading">
               <div>
                 <h2 id="project-list-title">项目</h2>
-                <p>把相关任务组织在一起</p>
+                <p>{activeProjects.length} 个进行中的项目</p>
               </div>
               <button
                 autoFocus
@@ -2968,39 +2978,39 @@ function MainApp() {
               </button>
             </div>
             {activeProjects.length > 0 ? (
-              <ul>
+              <ul className="project-grid">
                 {activeProjects.map((project, index) => {
                   const taskStats = taskStatsByProjectId.get(project.id) ?? {
                     active: 0,
                     completed: 0,
                   };
+                  const nextTask = nextTaskByProjectId.get(project.id);
 
                   return (
                     <li className="project-row" key={project.id}>
-                      <span
-                        aria-hidden="true"
-                        className="project-color"
-                        style={{ backgroundColor: project.color ?? "#98a6b5" }}
-                      />
                       <button
                         aria-label={`查看项目「${project.name}」下的所有任务`}
                         className="project-summary project-summary-button"
                         onClick={() => void handleOpenProjectTasks(project.id)}
                         type="button"
                       >
-                        <strong>{project.name}</strong>
-                        <span>
-                          {taskStats.active} 待办 · {taskStats.completed} 已完成
+                        <span className="project-identity">
+                          <i
+                            aria-hidden="true"
+                            className="project-color"
+                            style={{ backgroundColor: project.color ?? "#98a6b5" }}
+                          />
+                          <strong>{project.name}</strong>
+                        </span>
+                        <span className="project-stats">
+                          {taskStats.active} 条待办 · {taskStats.completed} 条已完成
+                        </span>
+                        <span className="project-next-task">
+                          <small>{nextTask ? "下一步" : "进度"}</small>
+                          <em>{nextTask ? nextTask.title : "暂时没有待办任务"}</em>
                         </span>
                       </button>
                       <div className="project-actions">
-                        <button
-                          className="secondary-button"
-                          onClick={() => void handleOpenProjectTasks(project.id)}
-                          type="button"
-                        >
-                          查看任务
-                        </button>
                         <button
                           aria-label={`上移项目：${project.name}`}
                           className="project-action-button"
@@ -3020,11 +3030,12 @@ function MainApp() {
                           ↓
                         </button>
                         <button
-                          className="secondary-button"
+                          aria-label={`管理项目：${project.name}`}
+                          className="project-manage-button"
                           onClick={() => openProjectEditor(project)}
                           type="button"
                         >
-                          管理
+                          ···
                         </button>
                       </div>
                     </li>
