@@ -2739,9 +2739,7 @@ function MainApp() {
                             }
                             onClick={(event) => handleCalendarTaskClick(event, task)}
                             onKeyDown={(event) => handleCalendarTaskKeyDown(event, task)}
-                            onPointerDown={(event) => {
-                              if (task.status === "active") startCalendarTaskDrag(event, task);
-                            }}
+                            onPointerDown={(event) => startCalendarTaskDrag(event, task)}
                             style={{ "--task-color": calendarTaskColor(task) } as CSSProperties}
                             type="button"
                           >
