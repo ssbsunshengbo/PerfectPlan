@@ -56,8 +56,9 @@ import type { RecurrenceRule, TaskPriority, TaskRecord } from "./features/tasks/
 
 type DatabaseState = "loading" | "ready" | "error";
 
-const navigationItems = ["今日", "任务", "日历", "项目", "回收站"] as const;
-type NavigationItem = (typeof navigationItems)[number];
+const navigationItems = ["任务", "日历", "项目", "回收站"] as const;
+/* Kept temporarily for the desktop-only daily-plan cleanup; it is no longer navigable. */
+type NavigationItem = "今日" | (typeof navigationItems)[number];
 type ReversibleTaskAction = {
   kind: "created" | "completed" | "rescheduled" | "trashed";
   nextRecurringTaskId?: string | null;
