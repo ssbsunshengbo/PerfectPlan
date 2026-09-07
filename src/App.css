@@ -820,6 +820,52 @@ h1 {
 .project-list li:last-child {
   border-bottom: 0;
 }
+.task-completed-group {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: #fafbfc;
+  list-style: none;
+}
+.task-completed-group-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 43px;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  padding: 0 24px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+.task-completed-group-toggle:hover {
+  background: #f4f6f8;
+  color: var(--muted);
+}
+.task-completed-group-toggle > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-completed-group-toggle i {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid currentcolor;
+  opacity: 0.72;
+  transition: transform 130ms ease;
+}
+.task-completed-group-toggle[aria-expanded="true"] i {
+  transform: rotate(90deg);
+}
+.task-completed-group-toggle small {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+}
 .task-complete-button {
   position: relative;
   width: 21px;
