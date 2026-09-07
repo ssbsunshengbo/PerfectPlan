@@ -1014,9 +1014,12 @@ h1 {
 .inline-subtask-disclosure,
 .inline-subtask-placeholder {
   display: grid;
-  width: 18px;
+  width: 12px;
   height: 26px;
   flex: 0 0 auto;
+  /* Keep the disclosure touch target tall, but do not let a tiny chevron
+   * create a full control-sized gap before every task title. */
+  margin-right: -6px;
   order: -1;
   place-items: center;
   border: 0;
@@ -1045,7 +1048,7 @@ h1 {
    * title. Keep the child guide on that same title baseline rather than on
    * the outer edge of the task row.
    */
-  --parent-title-offset: 63px;
+  --parent-title-offset: 51px;
   display: grid;
   width: calc(100% - var(--parent-title-offset));
   flex: 0 0 calc(100% - var(--parent-title-offset));
