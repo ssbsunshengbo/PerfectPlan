@@ -821,10 +821,18 @@ h1 {
   border-bottom: 0;
 }
 .task-completed-group {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: #fafbfc;
+  position: relative;
+  border-top: 1px solid #cadfd1;
+  border-bottom: 1px solid #cadfd1;
+  background: linear-gradient(90deg, #edf6f0 0%, #f8fbf9 72%);
   list-style: none;
+}
+.task-completed-group::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: #6e9d7d;
+  content: "";
 }
 .task-completed-group-toggle {
   display: flex;
@@ -835,19 +843,32 @@ h1 {
   border: 0;
   background: transparent;
   padding: 0 24px;
-  color: var(--faint);
+  color: #4d765b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 760;
   text-align: left;
 }
 .task-completed-group-toggle:hover {
-  background: #f4f6f8;
-  color: var(--muted);
+  background: rgb(219 239 225 / 72%);
+  color: #365d45;
 }
 .task-completed-group-toggle > span {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.task-completed-group-toggle > span::before {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: #6e9d7d;
+  color: #fff;
+  content: "✓";
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1;
 }
 .task-completed-group-toggle i {
   width: 0;
@@ -855,16 +876,21 @@ h1 {
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
   border-left: 5px solid currentcolor;
-  opacity: 0.72;
+  color: #779982;
+  opacity: 0.86;
   transition: transform 130ms ease;
 }
 .task-completed-group-toggle[aria-expanded="true"] i {
   transform: rotate(90deg);
 }
 .task-completed-group-toggle small {
-  color: var(--faint);
+  border: 1px solid rgb(100 148 116 / 32%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 65%);
+  padding: 3px 8px;
+  color: #5d8269;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 .task-complete-button {
   position: relative;
