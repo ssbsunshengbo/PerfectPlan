@@ -791,10 +791,10 @@ h1 {
   display: flex;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: 12px;
-  min-height: 64px;
+  gap: 10px;
+  min-height: 52px;
   border-bottom: 1px solid var(--line);
-  padding: 13px 24px;
+  padding: 9px 24px;
   transition:
     background 0.15s ease,
     box-shadow 0.15s ease;
@@ -950,17 +950,19 @@ h1 {
 }
 .task-row-body {
   display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(265px, 46%);
   min-width: 0;
   flex: 1 1 320px;
-  gap: 6px;
-  padding: 1px 0;
+  align-items: center;
+  gap: 16px;
+  min-height: 26px;
 }
 .task-row-info {
   display: grid;
-  grid-template-columns: minmax(0, 118px) minmax(0, 135px) minmax(0, 82px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 90px) minmax(0, 112px) minmax(0, 70px) minmax(0, 1fr);
   min-width: 0;
   align-items: center;
-  column-gap: 8px;
+  column-gap: 6px;
   color: var(--faint);
   font-size: 11px;
   font-weight: 620;
@@ -1074,7 +1076,7 @@ h1 {
    * title. Keep the child guide on that same title baseline rather than on
    * the outer edge of the task row.
    */
-  --parent-title-offset: 51px;
+  --parent-title-offset: 47px;
   display: grid;
   width: calc(100% - var(--parent-title-offset));
   flex: 0 0 calc(100% - var(--parent-title-offset));
@@ -3509,6 +3511,14 @@ h1 {
   .task-row,
   .project-list li {
     padding-inline: 16px;
+  }
+  .task-row-body {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .task-row {
+    min-height: 64px;
+    padding-block: 12px;
   }
   .project-list .project-grid {
     grid-template-columns: 1fr;
