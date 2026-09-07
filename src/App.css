@@ -1011,7 +1011,8 @@ h1 {
   border-color: var(--tag-color);
   background: color-mix(in srgb, var(--tag-color) 20%, #fff);
 }
-.inline-subtask-disclosure {
+.inline-subtask-disclosure,
+.inline-subtask-placeholder {
   display: grid;
   width: 18px;
   height: 26px;

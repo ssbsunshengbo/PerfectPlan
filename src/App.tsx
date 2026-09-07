@@ -236,7 +236,9 @@ function InlineSubtaskDisclosure({
   parentTask: TaskRecord;
   subtasks: TaskRecord[];
 }) {
-  if (subtasks.length === 0) return null;
+  if (subtasks.length === 0) {
+    return <span aria-hidden="true" className="inline-subtask-placeholder" />;
+  }
 
   const subtaskListId = `task-subtasks-${parentTask.id}`;
 
