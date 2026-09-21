@@ -35,7 +35,9 @@ jobs:
       - run: pnpm check
       - id: version
         name: Read application version
-        run: echo "value=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION="$(node -e "process.stdout.write(require('./package.json').version)")"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Require a matching release tag
         env:
           APP_VERSION: ${{ steps.version.outputs.value }}
