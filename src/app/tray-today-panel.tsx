@@ -24,6 +24,7 @@ function localDate() {
 
 export function TrayTodayPanel() {
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [overdueTaskIds, setOverdueTaskIds] = useState<Set<string>>(new Set());
   const [projectsById, setProjectsById] = useState<Map<string, ProjectRecord>>(new Map());
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +50,7 @@ export function TrayTodayPanel() {
           (task) => !seen.has(task.id) && Boolean(seen.add(task.id)),
         ),
       );
+      setOverdueTaskIds(new Set(overdue.map((task) => task.id)));
       setProjectsById(new Map(projects.map((project) => [project.id, project])));
       setTags(availableTags);
     } finally {
@@ -135,6 +137,7 @@ export function TrayTodayPanel() {
       <header className="tray-header">
         <div className="tray-heading">
           <div>
+            <p className="tray-kicker">PERFECTPLAN</p>
             <h1>今天</h1>
             <p className="tray-date">
               {new Intl.DateTimeFormat("zh-CN", {
@@ -184,50 +187,58 @@ export function TrayTodayPanel() {
           ) : null}
         </div>
       </form>
-      <div className="tray-section-heading">
-        <span>待完成</span>
-        <span>{isLoading ? "" : `${tasks.length} 项`}</span>
-      </div>
-      {isLoading ? (
-        <p className="tray-empty">正在读取今日计划…</p>
-      ) : tasks.length ? (
-        <ul className="tray-task-list">
-          {tasks.slice(0, 5).map((task) => {
-            const project = task.projectId ? projectsById.get(task.projectId) : null;
-            return (
-              <li key={task.id}>
-                <button
-                  aria-label={`完成任务：${task.title}`}
-                  className="tray-complete"
-                  onClick={() => void complete(task)}
-                  disabled={updatingTaskId === task.id}
-                  type="button"
-                />
-                <button
-                  className="tray-task-title"
-                  onClick={() => void openTask(task)}
-                  type="button"
-                >
-                  {task.title}
-                </button>
-                {project ? (
-                  <span
-                    className="tray-project-pill"
-                    style={{ "--project-color": project.color ?? "#8b92a0" } as React.CSSProperties}
-                  >
-                    {project.name}
-                  </span>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <p className="tray-empty">今天没有待完成任务。</p>
-      )}
-      {error ? <p className="tray-error">{error}</p> : null}
+      <section className="tray-tasks-section" aria-label="今日待完成任务">
+        <div className="tray-section-heading">
+          <span>待完成</span>
+          <span>{isLoading ? "" : `${tasks.length} 项`}</span>
+        </div>
+        <div className="tray-task-scroll">
+          {isLoading ? (
+            <p className="tray-empty">正在读取今日计划…</p>
+          ) : tasks.length ? (
+            <ul className="tray-task-list">
+              {tasks.map((task) => {
+                const project = task.projectId ? projectsById.get(task.projectId) : null;
+                const isOverdue = overdueTaskIds.has(task.id);
+                return (
+                  <li className={isOverdue ? "is-overdue" : ""} key={task.id}>
+                    <button
+                      aria-label={`完成任务：${task.title}`}
+                      className="tray-complete"
+                      onClick={() => void complete(task)}
+                      disabled={updatingTaskId === task.id}
+                      type="button"
+                    />
+                    <button
+                      className="tray-task-title"
+                      onClick={() => void openTask(task)}
+                      type="button"
+                    >
+                      {task.title}
+                    </button>
+                    {isOverdue ? <span className="tray-overdue">逾期</span> : null}
+                    {project ? (
+                      <span
+                        className="tray-task-project"
+                        style={
+                          { "--project-color": project.color ?? "#8b92a0" } as React.CSSProperties
+                        }
+                      >
+                        {project.name}
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="tray-empty">今天没有待完成任务。</p>
+          )}
+          {error ? <p className="tray-error">{error}</p> : null}
+        </div>
+      </section>
       <footer>
-        <span>点击任务即可在此处查看和编辑</span>
+        <span>点击任务可在旁边快速编辑</span>
         <button className="tray-new-task" onClick={() => void hidePanel()} type="button">
           收起
         </button>

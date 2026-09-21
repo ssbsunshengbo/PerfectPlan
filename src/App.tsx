@@ -33,6 +33,12 @@ import {
   toTimeValue,
 } from "./features/calendar/calendar-scheduling";
 import { dailyPlanService } from "./features/daily-plan/daily-plan-service";
+import { countdownService } from "./features/countdowns/countdown-service";
+import {
+  countdownThemes,
+  type CountdownRecord,
+  type CountdownTheme,
+} from "./features/countdowns/countdown-types";
 import {
   getNotificationPermissionState,
   requestNotificationPermission,
@@ -57,7 +63,7 @@ import type { RecurrenceRule, TaskPriority, TaskRecord } from "./features/tasks/
 
 type DatabaseState = "loading" | "ready" | "error";
 
-const navigationItems = ["任务", "日历", "项目", "回收站"] as const;
+const navigationItems = ["任务", "日历", "项目", "倒数日"] as const;
 /* Kept temporarily for the desktop-only daily-plan cleanup; it is no longer navigable. */
 type NavigationItem = "今日" | (typeof navigationItems)[number];
 const priorityFilterOptions: Array<{ label: string; value: "all" | TaskPriority }> = [
@@ -68,7 +74,7 @@ const priorityFilterOptions: Array<{ label: string; value: "all" | TaskPriority 
   { label: "高优先级", value: 3 },
 ];
 type ReversibleTaskAction = {
-  kind: "created" | "completed" | "rescheduled" | "trashed";
+  kind: "created" | "completed" | "rescheduled";
   nextRecurringTaskId?: string | null;
   previousSchedule?: Pick<TaskRecord, "scheduledDate" | "scheduledStartAt" | "estimatedMinutes">;
   rescheduleLabel?: string;
@@ -138,6 +144,27 @@ function addDays(localDate: string, amount: number): string {
   const date = toLocalDate(localDate);
   date.setDate(date.getDate() + amount);
   return toLocalDateValue(date);
+}
+
+function formatCountdownTargetDate(localDate: string): string {
+  const [year, month, day] = localDate.split("-").map(Number);
+  return `${year}年${month}月${day}日`;
+}
+
+function getCountdownTiming(targetDate: string): {
+  days: number;
+  isToday: boolean;
+  label: string;
+} {
+  const [targetYear, targetMonth, targetDay] = targetDate.split("-").map(Number);
+  const today = toLocalDateValue().split("-").map(Number);
+  const targetTime = Date.UTC(targetYear ?? 0, (targetMonth ?? 1) - 1, targetDay ?? 1);
+  const todayTime = Date.UTC(today[0] ?? 0, (today[1] ?? 1) - 1, today[2] ?? 1);
+  const days = Math.round((targetTime - todayTime) / 86_400_000);
+
+  if (days === 0) return { days, isToday: true, label: "就是今天" };
+  if (days > 0) return { days, isToday: false, label: `还有 ${days} 天` };
+  return { days, isToday: false, label: `已过去 ${Math.abs(days)} 天` };
 }
 
 function startOfWeek(localDate: string): string {
@@ -294,11 +321,11 @@ function MainApp() {
   const [isRetryingDatabase, setIsRetryingDatabase] = useState(false);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [activeView, setActiveView] = useState<NavigationItem>("任务");
+  const [countdowns, setCountdowns] = useState<CountdownRecord[]>([]);
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [taskTagsById, setTaskTagsById] = useState<Map<string, TagRecord[]>>(new Map());
   const [tasks, setTasks] = useState<TaskRecord[]>([]);
-  const [trashedTasks, setTrashedTasks] = useState<TaskRecord[]>([]);
   const [todayFocusTasks, setTodayFocusTasks] = useState<TaskRecord[]>([]);
   const [todayCarryoverSuggestions, setTodayCarryoverSuggestions] = useState<TaskRecord[]>([]);
   const [todayScheduledTasks, setTodayScheduledTasks] = useState<TaskRecord[]>([]);
@@ -332,11 +359,16 @@ function MainApp() {
   const [isTaskFiltersOpen, setIsTaskFiltersOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isProjectCreateOpen, setIsProjectCreateOpen] = useState(false);
+  const [isCountdownDialogOpen, setIsCountdownDialogOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<ProjectRecord | null>(null);
+  const [selectedCountdown, setSelectedCountdown] = useState<CountdownRecord | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskRecord | null>(null);
   const [selectedTaskReminder, setSelectedTaskReminder] = useState<ReminderRecord | null>(null);
   const [selectedTaskRecurrence, setSelectedTaskRecurrence] = useState<RecurrenceRule | null>(null);
   const [pendingTaskDeletion, setPendingTaskDeletion] = useState<TaskRecord | null>(null);
+  const [pendingCountdownDeletion, setPendingCountdownDeletion] = useState<CountdownRecord | null>(
+    null,
+  );
   const [subtasks, setSubtasks] = useState<TaskRecord[]>([]);
   const [subtasksByParentId, setSubtasksByParentId] = useState<Map<string, TaskRecord[]>>(
     new Map(),
@@ -347,8 +379,12 @@ function MainApp() {
   const [newProjectName, setNewProjectName] = useState("");
   const [projectDraftColor, setProjectDraftColor] = useState("");
   const [projectDraftName, setProjectDraftName] = useState("");
+  const [countdownDraftTitle, setCountdownDraftTitle] = useState("");
+  const [countdownDraftDate, setCountdownDraftDate] = useState(() => toLocalDateValue());
+  const [countdownDraftTheme, setCountdownDraftTheme] = useState<CountdownTheme>("dusk");
   const [isSavingTask, setIsSavingTask] = useState(false);
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isSavingCountdown, setIsSavingCountdown] = useState(false);
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [isSavingTaskDetails, setIsSavingTaskDetails] = useState(false);
   const [isSavingSubtask, setIsSavingSubtask] = useState(false);
@@ -372,9 +408,12 @@ function MainApp() {
   const isModalOpen = Boolean(
     isQuickAddOpen ||
     isProjectCreateOpen ||
+    isCountdownDialogOpen ||
     selectedProject ||
+    selectedCountdown ||
     selectedTask ||
     pendingTaskDeletion ||
+    pendingCountdownDeletion ||
     isDailyReviewOpen ||
     calendarScheduleDraft,
   );
@@ -475,11 +514,14 @@ function MainApp() {
           return;
         }
 
-        const [listedTasks, activeProjects, availableTags] = await Promise.all([
-          taskService.listTasks(),
-          projectService.listProjects(),
-          tagService.listTags(),
-        ]);
+        const [listedTasks, activeProjects, availableTags, availableCountdowns] = await Promise.all(
+          [
+            taskService.listTasks(),
+            projectService.listProjects(),
+            tagService.listTags(),
+            countdownService.listCountdowns(),
+          ],
+        );
         const initialTaskTags = await tagService.listTaskTagsByTaskIds(
           listedTasks.map((task) => task.id),
         );
@@ -489,6 +531,7 @@ function MainApp() {
         setTaskTagsById(initialTaskTags);
         setProjects(activeProjects);
         setTags(availableTags);
+        setCountdowns(availableCountdowns);
         setDatabaseState("ready");
         setDatabaseMessage("本地数据库已准备完成");
       } catch (error) {
@@ -516,7 +559,11 @@ function MainApp() {
 
       if (event.key.toLowerCase() === "n" && databaseState === "ready") {
         event.preventDefault();
-        setIsQuickAddOpen(true);
+        if (activeView === "倒数日") {
+          openCountdownCreator();
+        } else {
+          setIsQuickAddOpen(true);
+        }
         return;
       }
 
@@ -529,7 +576,7 @@ function MainApp() {
 
     window.addEventListener("keydown", handleGlobalKeyDown);
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, [databaseState]);
+  }, [activeView, databaseState]);
 
   useEffect(() => {
     if (databaseState !== "ready") return;
@@ -850,6 +897,88 @@ function MainApp() {
     }
   }
 
+  async function loadCountdowns() {
+    const listedCountdowns = await countdownService.listCountdowns();
+    setCountdowns(listedCountdowns);
+  }
+
+  function openCountdownCreator() {
+    setTaskError(null);
+    setCountdownDraftTitle("");
+    setCountdownDraftDate(toLocalDateValue());
+    setCountdownDraftTheme("dusk");
+    setIsCountdownDialogOpen(true);
+  }
+
+  function openCountdownEditor(countdown: CountdownRecord) {
+    setTaskError(null);
+    setCountdownDraftTitle(countdown.title);
+    setCountdownDraftDate(countdown.targetDate);
+    setCountdownDraftTheme(countdown.theme);
+    setSelectedCountdown(countdown);
+  }
+
+  function closeCountdownDialog() {
+    if (isSavingCountdown) return;
+    setIsCountdownDialogOpen(false);
+    setSelectedCountdown(null);
+    setTaskError(null);
+  }
+
+  async function handleSaveCountdown(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTaskError(null);
+    setIsSavingCountdown(true);
+
+    try {
+      const input = {
+        targetDate: countdownDraftDate,
+        theme: countdownDraftTheme,
+        title: countdownDraftTitle,
+      };
+      const savedCountdown = selectedCountdown
+        ? await countdownService.updateCountdown(selectedCountdown.id, input)
+        : await countdownService.createCountdown(input);
+
+      setCountdowns((currentCountdowns) => {
+        const nextCountdowns = selectedCountdown
+          ? currentCountdowns.map((countdown) =>
+              countdown.id === savedCountdown.id ? savedCountdown : countdown,
+            )
+          : [...currentCountdowns, savedCountdown];
+        return nextCountdowns.sort(
+          (left, right) =>
+            left.targetDate.localeCompare(right.targetDate) ||
+            left.createdAt.localeCompare(right.createdAt),
+        );
+      });
+      setIsCountdownDialogOpen(false);
+      setSelectedCountdown(null);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "保存倒数日失败，请重试。");
+    } finally {
+      setIsSavingCountdown(false);
+    }
+  }
+
+  async function handleDeleteCountdown(countdown: CountdownRecord) {
+    setTaskError(null);
+    setIsSavingCountdown(true);
+
+    try {
+      await countdownService.deleteCountdown(countdown.id);
+      setCountdowns((currentCountdowns) =>
+        currentCountdowns.filter((currentCountdown) => currentCountdown.id !== countdown.id),
+      );
+      setPendingCountdownDeletion(null);
+      setSelectedCountdown(null);
+    } catch (error) {
+      setTaskError(error instanceof Error ? error.message : "删除倒数日失败，请重试。");
+    } finally {
+      setIsSavingCountdown(false);
+    }
+  }
+
   async function handleSaveTaskDetails(input: TaskDetailSaveInput) {
     if (!selectedTask) return;
 
@@ -1066,40 +1195,32 @@ function MainApp() {
     }
   }
 
-  function requestTrashTask(task: TaskRecord) {
+  function requestDeleteTask(task: TaskRecord) {
     setPendingTaskDeletion(task);
   }
 
-  async function handleTrashTask(task: TaskRecord) {
+  async function handleDeleteTask(task: TaskRecord) {
     setTaskError(null);
 
     try {
-      const trashedTask = await taskService.trashTask(task.id);
+      await taskService.deleteTask(task.id);
       setTasks((currentTasks) => currentTasks.filter((currentTask) => currentTask.id !== task.id));
-      setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
-      setLastTaskAction({ kind: "trashed", task: { id: task.id, title: task.title } });
+      setTaskTagsById((currentTags) => {
+        const nextTags = new Map(currentTags);
+        nextTags.delete(task.id);
+        return nextTags;
+      });
+      setSubtasksByParentId((currentSubtasks) => {
+        const nextSubtasks = new Map(currentSubtasks);
+        nextSubtasks.delete(task.id);
+        return nextSubtasks;
+      });
       setSelectedTask(null);
       setPendingTaskDeletion(null);
       if (activeView === "今日") await loadTodayTasks();
       if (activeView === "日历") await loadCalendarTasks();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "删除任务失败，请重试。");
-    }
-  }
-
-  async function handleRestoreTask(task: TaskRecord) {
-    setTaskError(null);
-
-    try {
-      await taskService.restoreTask(task.id);
-      setTrashedTasks((currentTasks) =>
-        currentTasks.filter((currentTask) => currentTask.id !== task.id),
-      );
-      if (activeView === "任务") await loadInboxTasks();
-      if (activeView === "今日") await loadTodayTasks();
-      if (activeView === "日历") await loadCalendarTasks();
-    } catch (error) {
-      setTaskError(error instanceof Error ? error.message : "恢复任务失败，请重试。");
     }
   }
 
@@ -1111,11 +1232,10 @@ function MainApp() {
 
     try {
       if (lastTaskAction.kind === "created") {
-        const trashedTask = await taskService.trashTask(lastTaskAction.task.id);
+        await taskService.deleteTask(lastTaskAction.task.id);
         setTasks((currentTasks) =>
           currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
         );
-        setTrashedTasks((currentTasks) => [trashedTask, ...currentTasks]);
       } else if (lastTaskAction.kind === "rescheduled" && lastTaskAction.previousSchedule) {
         await taskService.updateTask(lastTaskAction.task.id, lastTaskAction.previousSchedule);
         await loadInboxTasks();
@@ -1128,11 +1248,8 @@ function MainApp() {
             lastTaskAction.nextRecurringTaskId,
           );
         } else {
-          await taskService.restoreTask(lastTaskAction.task.id);
+          await taskService.undoCompleteTask(lastTaskAction.task.id);
         }
-        setTrashedTasks((currentTasks) =>
-          currentTasks.filter((task) => task.id !== lastTaskAction.task.id),
-        );
         await loadInboxTasks();
         if (activeView === "日历") await loadCalendarTasks();
       }
@@ -1154,7 +1271,7 @@ function MainApp() {
       if (item === "今日") await loadTodayTasks();
       if (item === "日历") await loadCalendarTasks();
       if (item === "项目") await loadTaskCatalog();
-      if (item === "回收站") setTrashedTasks(await taskService.listTrashedTasks());
+      if (item === "倒数日") await loadCountdowns();
     } catch (error) {
       setTaskError(error instanceof Error ? error.message : "无法读取任务，请重试。");
     } finally {
@@ -1712,7 +1829,7 @@ function MainApp() {
   const isInbox = activeView === "任务";
   const isCalendar = activeView === "日历";
   const isProjects = activeView === "项目";
-  const isTrash = activeView === "回收站";
+  const isCountdowns = activeView === "倒数日";
   const hasInboxFilters = Boolean(
     activeTagId || searchQuery || projectFilter !== "all" || priorityFilter !== "all",
   );
@@ -1885,20 +2002,6 @@ function MainApp() {
           </ul>
         </nav>
 
-        <button
-          aria-keyshortcuts="Control+K Meta+K"
-          className="command-button"
-          disabled={databaseState !== "ready"}
-          onClick={() => {
-            setActiveView("任务");
-            window.requestAnimationFrame(() => searchInputRef.current?.focus());
-          }}
-          type="button"
-        >
-          <span>快速查找</span>
-          <kbd>⌘ K</kbd>
-        </button>
-
         <p className="sidebar-note">本地优先 · 无需账户</p>
       </aside>
 
@@ -1906,16 +2009,24 @@ function MainApp() {
         <header className="workspace-header">
           <div>
             <p className="eyebrow">{activeView}</p>
-            <h1>{isToday ? "今天，专注少数要事" : isInbox ? "所有任务，一处找回" : activeView}</h1>
+            <h1>
+              {isToday
+                ? "今天，专注少数要事"
+                : isInbox
+                  ? "所有任务，一处找回"
+                  : isCountdowns
+                    ? "把重要的日子留在眼前"
+                    : activeView}
+            </h1>
           </div>
           <button
             aria-keyshortcuts="Control+N Meta+N"
             className="primary-button"
             disabled={databaseState !== "ready"}
-            onClick={() => setIsQuickAddOpen(true)}
+            onClick={() => (isCountdowns ? openCountdownCreator() : setIsQuickAddOpen(true))}
             type="button"
           >
-            添加任务
+            {isCountdowns ? "新建倒数日" : "添加任务"}
           </button>
         </header>
 
@@ -3054,7 +3165,7 @@ function MainApp() {
                                 }
                                 if (event.key === "Delete" || event.key === "Backspace") {
                                   event.preventDefault();
-                                  requestTrashTask(task);
+                                  requestDeleteTask(task);
                                 }
                               }}
                               type="button"
@@ -3120,7 +3231,7 @@ function MainApp() {
                           <button
                             aria-label={`删除任务：${task.title}`}
                             className="task-delete-button"
-                            onClick={() => requestTrashTask(task)}
+                            onClick={() => requestDeleteTask(task)}
                             type="button"
                           >
                             删除
@@ -3142,6 +3253,52 @@ function MainApp() {
               </ul>
             ) : (
               <p className="project-empty">没有匹配当前搜索或筛选条件的待完成任务。</p>
+            )}
+          </section>
+        ) : isCountdowns ? (
+          <section className="countdown-list" aria-labelledby="countdown-list-title">
+            <div className="countdown-list-heading">
+              <div>
+                <h2 id="countdown-list-title">倒数日</h2>
+                <p>为假期、纪念日与每一个值得期待的日子留一盏灯。</p>
+              </div>
+              <span className="countdown-count" aria-label={`共 ${countdowns.length} 个倒数日`}>
+                {countdowns.length} 个
+              </span>
+            </div>
+            {countdowns.length > 0 ? (
+              <ul className="countdown-grid">
+                {countdowns.map((countdown) => {
+                  const timing = getCountdownTiming(countdown.targetDate);
+                  const number = timing.isToday ? "今天" : Math.abs(timing.days);
+
+                  return (
+                    <li key={countdown.id}>
+                      <button
+                        aria-label={`编辑倒数日：${countdown.title}，${timing.label}`}
+                        className={`countdown-card theme-${countdown.theme}`}
+                        onClick={() => openCountdownEditor(countdown)}
+                        type="button"
+                      >
+                        <span className="countdown-card-sheen" aria-hidden="true" />
+                        <span className="countdown-card-title">{countdown.title}</span>
+                        <strong className={timing.isToday ? "is-today" : ""}>{number}</strong>
+                        <span className="countdown-card-label">{timing.label}</span>
+                        <small>目标 {formatCountdownTargetDate(countdown.targetDate)}</small>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="countdown-empty">
+                <span aria-hidden="true">✦</span>
+                <h2>还没有倒数日</h2>
+                <p>把想要期待、纪念或记住的日子放在这里。</p>
+                <button className="secondary-button" onClick={openCountdownCreator} type="button">
+                  添加第一个倒数日
+                </button>
+              </div>
             )}
           </section>
         ) : isProjects ? (
@@ -3236,36 +3393,6 @@ function MainApp() {
               </div>
             ) : null}
           </section>
-        ) : isTrash ? (
-          <section className="project-list" aria-labelledby="trash-title">
-            <div className="task-list-heading">
-              <div>
-                <h2 id="trash-title">回收站</h2>
-                <p>任务会保留原项目、标签和时间信息。</p>
-              </div>
-            </div>
-            {trashedTasks.length > 0 ? (
-              <ul>
-                {trashedTasks.map((task) => (
-                  <li className="project-row" key={task.id}>
-                    <div className="project-summary">
-                      <strong>{task.title}</strong>
-                      <span>删除后仍可恢复</span>
-                    </div>
-                    <button
-                      className="secondary-button"
-                      onClick={() => void handleRestoreTask(task)}
-                      type="button"
-                    >
-                      恢复任务
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="project-empty">回收站为空。删除的任务会出现在这里，直到你恢复它。</p>
-            )}
-          </section>
         ) : (
           <section className="empty-state" aria-labelledby="future-view-title">
             <span className="empty-state-icon" aria-hidden="true">
@@ -3294,9 +3421,7 @@ function MainApp() {
                 ? `已添加「${lastTaskAction.task.title}」`
                 : lastTaskAction.kind === "completed"
                   ? `已完成「${lastTaskAction.task.title}」`
-                  : lastTaskAction.kind === "rescheduled"
-                    ? `已将「${lastTaskAction.task.title}」改期到${lastTaskAction.rescheduleLabel}`
-                    : `已移入回收站「${lastTaskAction.task.title}」`}
+                  : `已将「${lastTaskAction.task.title}」改期到${lastTaskAction.rescheduleLabel}`}
             </span>
             <button
               disabled={isUndoingTaskAction}
@@ -3599,6 +3724,150 @@ function MainApp() {
         </div>
       ) : null}
 
+      {isCountdownDialogOpen || selectedCountdown ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-labelledby="countdown-dialog-title"
+            aria-modal="true"
+            className="countdown-dialog"
+            role="dialog"
+            onKeyDown={(event) => {
+              trapFocusInDialog(event);
+              if (event.key === "Escape") closeCountdownDialog();
+            }}
+          >
+            <div className="quick-add-header">
+              <div>
+                <p className="eyebrow">倒数日</p>
+                <h2 id="countdown-dialog-title">
+                  {selectedCountdown ? "编辑倒数日" : "新建倒数日"}
+                </h2>
+              </div>
+              <button
+                aria-label="关闭倒数日窗口"
+                className="icon-button"
+                disabled={isSavingCountdown}
+                onClick={closeCountdownDialog}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={(event) => void handleSaveCountdown(event)}>
+              <label className="countdown-title-field" htmlFor="countdown-title">
+                名称
+                <input
+                  autoFocus
+                  disabled={isSavingCountdown}
+                  id="countdown-title"
+                  maxLength={60}
+                  onChange={(event) => setCountdownDraftTitle(event.target.value)}
+                  placeholder="例如：国庆假期、我们的纪念日"
+                  value={countdownDraftTitle}
+                />
+              </label>
+              <label className="countdown-date-field" htmlFor="countdown-date">
+                目标日期
+                <input
+                  disabled={isSavingCountdown}
+                  id="countdown-date"
+                  onChange={(event) => setCountdownDraftDate(event.target.value)}
+                  required
+                  type="date"
+                  value={countdownDraftDate}
+                />
+              </label>
+              <fieldset className="countdown-theme-field">
+                <legend>卡片主题</legend>
+                <div>
+                  {countdownThemes.map((theme) => (
+                    <button
+                      aria-label={`选择${theme}主题`}
+                      aria-pressed={countdownDraftTheme === theme}
+                      className={`countdown-theme-option theme-${theme}`}
+                      disabled={isSavingCountdown}
+                      key={theme}
+                      onClick={() => setCountdownDraftTheme(theme)}
+                      type="button"
+                    >
+                      <span aria-hidden="true">{countdownDraftTheme === theme ? "✓" : ""}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              {taskError ? <p className="form-error">{taskError}</p> : null}
+              <div className="dialog-actions countdown-dialog-actions">
+                {selectedCountdown ? (
+                  <button
+                    className="dialog-delete-button"
+                    disabled={isSavingCountdown}
+                    onClick={() => {
+                      setPendingCountdownDeletion(selectedCountdown);
+                      setSelectedCountdown(null);
+                    }}
+                    type="button"
+                  >
+                    删除
+                  </button>
+                ) : null}
+                <span />
+                <button
+                  className="secondary-button"
+                  disabled={isSavingCountdown}
+                  onClick={closeCountdownDialog}
+                  type="button"
+                >
+                  取消
+                </button>
+                <button className="primary-button" disabled={isSavingCountdown} type="submit">
+                  {isSavingCountdown ? "正在保存…" : "保存倒数日"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {pendingCountdownDeletion ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-describedby="delete-countdown-description"
+            aria-labelledby="delete-countdown-title"
+            aria-modal="true"
+            className="confirmation-dialog"
+            role="dialog"
+            onKeyDown={(event) => {
+              trapFocusInDialog(event);
+              if (event.key === "Escape" && !isSavingCountdown) setPendingCountdownDeletion(null);
+            }}
+          >
+            <p className="eyebrow">倒数日</p>
+            <h2 id="delete-countdown-title">删除这个倒数日？</h2>
+            <p id="delete-countdown-description">
+              「{pendingCountdownDeletion.title}」会从当前设备永久删除，无法恢复。
+            </p>
+            <div className="dialog-actions">
+              <button
+                className="secondary-button"
+                disabled={isSavingCountdown}
+                onClick={() => setPendingCountdownDeletion(null)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="danger-button"
+                disabled={isSavingCountdown}
+                onClick={() => void handleDeleteCountdown(pendingCountdownDeletion)}
+                type="button"
+              >
+                {isSavingCountdown ? "正在删除…" : "永久删除"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {pendingTaskDeletion ? (
         <div className="modal-backdrop" role="presentation">
           <section
@@ -3613,9 +3882,9 @@ function MainApp() {
             }}
           >
             <p className="eyebrow">任务操作</p>
-            <h2 id="delete-task-title">移入回收站？</h2>
+            <h2 id="delete-task-title">永久删除任务？</h2>
             <p id="delete-task-description">
-              「{pendingTaskDeletion.title}」会保留全部信息，并可随时从回收站恢复。
+              「{pendingTaskDeletion.title}」及其子任务、提醒和重复规则会被永久删除，无法恢复。
             </p>
             <div className="dialog-actions">
               <button
@@ -3627,10 +3896,10 @@ function MainApp() {
               </button>
               <button
                 className="danger-button"
-                onClick={() => void handleTrashTask(pendingTaskDeletion)}
+                onClick={() => void handleDeleteTask(pendingTaskDeletion)}
                 type="button"
               >
-                移入回收站
+                永久删除
               </button>
             </div>
           </section>

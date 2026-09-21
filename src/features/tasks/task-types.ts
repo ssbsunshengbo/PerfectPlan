@@ -1,4 +1,4 @@
-export const taskStatuses = ["active", "completed", "trashed"] as const;
+export const taskStatuses = ["active", "completed"] as const;
 export type TaskStatus = (typeof taskStatuses)[number];
 
 export const taskPriorities = [0, 1, 2, 3] as const;

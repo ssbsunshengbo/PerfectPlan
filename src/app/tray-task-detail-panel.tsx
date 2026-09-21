@@ -125,64 +125,66 @@ export function TrayTaskDetailPanel() {
       </header>
       {task ? (
         <>
-          <input
-            aria-label="任务标题"
-            className="tray-detail-title"
-            disabled={isSaving}
-            onChange={(event) => setTitle(event.target.value)}
-            value={title}
-          />
-          <div className="tray-detail-meta">
-            {project ? (
-              <span
-                className="tray-project-pill"
-                style={{ "--project-color": project.color ?? "#8b92a0" } as React.CSSProperties}
-              >
-                {project.name}
-              </span>
-            ) : (
-              <span className="tray-detail-muted">未归属项目</span>
-            )}
-          </div>
-          <label className="tray-detail-notes">
-            <span>备注</span>
-            <textarea
+          <div className="tray-detail-content">
+            <input
+              aria-label="任务标题"
+              className="tray-detail-title"
               disabled={isSaving}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="写下需要记住的内容"
-              value={notes}
+              onChange={(event) => setTitle(event.target.value)}
+              value={title}
             />
-          </label>
-          <section className="tray-detail-schedule" aria-label="快速安排日期">
-            <span>安排到</span>
-            <div>
-              <button
-                className={task.scheduledDate === localDate() ? "is-active" : ""}
-                disabled={isSaving}
-                onClick={() => void scheduleTask(localDate())}
-                type="button"
-              >
-                今天
-              </button>
-              <button
-                className={task.scheduledDate === localDate(1) ? "is-active" : ""}
-                disabled={isSaving}
-                onClick={() => void scheduleTask(localDate(1))}
-                type="button"
-              >
-                明天
-              </button>
-              <button
-                className={!task.scheduledDate ? "is-active" : ""}
-                disabled={isSaving}
-                onClick={() => void scheduleTask(null)}
-                type="button"
-              >
-                未排期
-              </button>
+            <div className="tray-detail-meta">
+              {project ? (
+                <span
+                  className="tray-project-pill"
+                  style={{ "--project-color": project.color ?? "#8b92a0" } as React.CSSProperties}
+                >
+                  {project.name}
+                </span>
+              ) : (
+                <span className="tray-detail-muted">未归属项目</span>
+              )}
             </div>
-          </section>
-          {error ? <p className="tray-error">{error}</p> : null}
+            <label className="tray-detail-notes">
+              <span>备注</span>
+              <textarea
+                disabled={isSaving}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="写下需要记住的内容"
+                value={notes}
+              />
+            </label>
+            <section className="tray-detail-schedule" aria-label="快速安排日期">
+              <span>安排到</span>
+              <div>
+                <button
+                  className={task.scheduledDate === localDate() ? "is-active" : ""}
+                  disabled={isSaving}
+                  onClick={() => void scheduleTask(localDate())}
+                  type="button"
+                >
+                  今天
+                </button>
+                <button
+                  className={task.scheduledDate === localDate(1) ? "is-active" : ""}
+                  disabled={isSaving}
+                  onClick={() => void scheduleTask(localDate(1))}
+                  type="button"
+                >
+                  明天
+                </button>
+                <button
+                  className={!task.scheduledDate ? "is-active" : ""}
+                  disabled={isSaving}
+                  onClick={() => void scheduleTask(null)}
+                  type="button"
+                >
+                  未排期
+                </button>
+              </div>
+            </section>
+            {error ? <p className="tray-error">{error}</p> : null}
+          </div>
           <footer className="tray-detail-footer">
             <button
               className="tray-detail-complete"

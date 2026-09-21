@@ -1,20 +1,34 @@
-use tauri_plugin_sql::{Migration, MigrationKind};
-use tauri_plugin_positioner::{Position, WindowExt};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Emitter, Manager, PhysicalPosition, WindowEvent,
 };
+use tauri_plugin_positioner::{Position, WindowExt};
+use tauri_plugin_sql::{Migration, MigrationKind};
 
 const DATABASE_CONNECTION: &str = "sqlite:perfectplan.db";
 
 fn migrations() -> Vec<Migration> {
-    vec![Migration {
-        version: 1,
-        description: "create_initial_schema",
-        sql: include_str!("../migrations/0001_initial_schema.sql"),
-        kind: MigrationKind::Up,
-    }]
+    vec![
+        Migration {
+            version: 1,
+            description: "create_initial_schema",
+            sql: include_str!("../migrations/0001_initial_schema.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "remove_recycle_bin_tasks",
+            sql: include_str!("../migrations/0002_remove_trashed_tasks.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 3,
+            description: "create_countdowns",
+            sql: include_str!("../migrations/0003_create_countdowns.sql"),
+            kind: MigrationKind::Up,
+        },
+    ]
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -515,18 +515,6 @@ export const taskService = {
     return rows.map(toTaskRecord);
   },
 
-  async listTrashedTasks(): Promise<TaskRecord[]> {
-    const database = await getDatabase();
-    const rows = await database.select<TaskRow[]>(
-      `SELECT ${taskSelectFields}
-       FROM tasks
-       WHERE status = 'trashed' AND parent_task_id IS NULL
-       ORDER BY deleted_at DESC, created_at DESC`,
-    );
-
-    return rows.map(toTaskRecord);
-  },
-
   async listActiveSubtasks(parentTaskId: string): Promise<TaskRecord[]> {
     const database = await getDatabase();
     const rows = await database.select<TaskRow[]>(
@@ -856,13 +844,12 @@ export const taskService = {
       );
       if (restoredTask.rowsAffected === 0) throw new TaskNotFoundError(taskId);
 
-      const trashedNextTask = await database.execute(
-        `UPDATE tasks
-         SET status = 'trashed', deleted_at = $1, updated_at = $1
-         WHERE id = $2 AND status = 'active'`,
-        [restoredAt, nextTaskId],
+      const deletedNextTask = await database.execute(
+        `DELETE FROM tasks
+         WHERE id = $1 AND status = 'active'`,
+        [nextTaskId],
       );
-      if (trashedNextTask.rowsAffected === 0) throw new TaskNotFoundError(nextTaskId);
+      if (deletedNextTask.rowsAffected === 0) throw new TaskNotFoundError(nextTaskId);
 
       await database.execute("DELETE FROM recurrence_rules WHERE task_id = $1", [nextTaskId]);
       await database.execute(
@@ -891,14 +878,14 @@ export const taskService = {
     return requireTask(taskId);
   },
 
-  async trashTask(taskId: string): Promise<TaskRecord> {
+  async undoCompleteTask(taskId: string): Promise<TaskRecord> {
     const database = await getDatabase();
-    const deletedAt = now();
+    const updatedAt = now();
     const result = await database.execute(
       `UPDATE tasks
-       SET status = $1, deleted_at = $2, updated_at = $3
-       WHERE id = $4 OR parent_task_id = $4`,
-      ["trashed", deletedAt, deletedAt, taskId],
+       SET status = 'active', completed_at = NULL, deleted_at = NULL, updated_at = $1
+       WHERE id = $2 AND status = 'completed'`,
+      [updatedAt, taskId],
     );
 
     if (result.rowsAffected === 0) {
@@ -908,20 +895,16 @@ export const taskService = {
     return requireTask(taskId);
   },
 
-  async restoreTask(taskId: string): Promise<TaskRecord> {
+  async deleteTask(taskId: string): Promise<void> {
     const database = await getDatabase();
-    const updatedAt = now();
     const result = await database.execute(
-      `UPDATE tasks
-       SET status = $1, completed_at = NULL, deleted_at = NULL, updated_at = $2
-       WHERE id = $3 OR parent_task_id = $3`,
-      ["active", updatedAt, taskId],
+      `DELETE FROM tasks
+       WHERE id = $1`,
+      [taskId],
     );
 
     if (result.rowsAffected === 0) {
       throw new TaskNotFoundError(taskId);
     }
-
-    return requireTask(taskId);
   },
 };

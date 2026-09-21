@@ -190,33 +190,30 @@ describe("taskService", () => {
     expect(task.status).toBe("active");
     expect(execute.mock.calls[0]?.[0]).toBe("BEGIN IMMEDIATE");
     expect(execute.mock.calls[1]?.[0]).toContain("status = 'completed'");
-    expect(execute.mock.calls[2]?.[0]).toContain("status = 'active'");
+    expect(execute.mock.calls[2]?.[0]).toContain("DELETE FROM tasks");
     expect(execute.mock.calls[3]?.[0]).toContain("DELETE FROM recurrence_rules");
     expect(execute.mock.calls[4]?.[0]).toContain("INSERT INTO recurrence_rules");
     expect(execute.mock.calls[5]?.[0]).toBe("COMMIT");
   });
 
-  it("moves an accidentally created task to the trash for undo", async () => {
-    select.mockResolvedValueOnce([
-      { ...taskRow, status: "trashed", deleted_at: "2026-09-01T00:00:00.000Z" },
-    ]);
+  it("permanently deletes a task and relies on database cascades for its dependents", async () => {
     execute.mockResolvedValueOnce({ rowsAffected: 1 });
 
-    const task = await taskService.trashTask("task-1");
+    await taskService.deleteTask("task-1");
 
-    expect(task.status).toBe("trashed");
-    expect(execute.mock.calls[0]?.[0]).toContain("SET status = $1, deleted_at = $2");
-    expect(execute.mock.calls[0]?.[0]).toContain("OR parent_task_id = $4");
-    expect(execute.mock.calls[0]?.[1]?.[0]).toBe("trashed");
+    expect(execute.mock.calls[0]?.[0]).toContain("DELETE FROM tasks");
+    expect(execute.mock.calls[0]?.[0]).toContain("WHERE id = $1");
+    expect(execute.mock.calls[0]?.[1]).toEqual(["task-1"]);
   });
 
-  it("lists only root tasks from the recycle bin", async () => {
-    select.mockResolvedValueOnce([{ ...taskRow, status: "trashed", deleted_at: "2026-09-01" }]);
+  it("undoes a one-off completion without changing its subtasks", async () => {
+    select.mockResolvedValueOnce([{ ...taskRow, status: "active", completed_at: null }]);
+    execute.mockResolvedValueOnce({ rowsAffected: 1 });
 
-    const tasks = await taskService.listTrashedTasks();
+    const task = await taskService.undoCompleteTask("task-1");
 
-    expect(tasks).toHaveLength(1);
-    expect(select.mock.calls[0]?.[0]).toContain("status = 'trashed' AND parent_task_id IS NULL");
+    expect(task.status).toBe("active");
+    expect(execute.mock.calls[0]?.[0]).toContain("WHERE id = $2 AND status = 'completed'");
   });
 
   it("loads active and completed subtasks for visible parent tasks in one query", async () => {
@@ -236,16 +233,6 @@ describe("taskService", () => {
     expect(select.mock.calls[0]?.[1]).toEqual(["task-1", "task-2"]);
     expect(subtasksByParentId.get("task-1")?.[0]?.title).toBe("整理资料");
     expect(subtasksByParentId.get("task-2")?.[0]?.title).toBe("发送邮件");
-  });
-
-  it("restores a task and its direct subtasks", async () => {
-    select.mockResolvedValueOnce([taskRow]);
-    execute.mockResolvedValueOnce({ rowsAffected: 2 });
-
-    const task = await taskService.restoreTask("task-1");
-
-    expect(task.status).toBe("active");
-    expect(execute.mock.calls[0]?.[0]).toContain("OR parent_task_id = $3");
   });
 
   it("lists active root tasks associated with a tag", async () => {
