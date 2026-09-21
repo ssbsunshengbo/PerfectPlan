@@ -46,6 +46,10 @@ jobs:
     name: Build macOS installer
     needs: verify-release
     runs-on: macos-latest
+    env:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -57,7 +61,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Import Apple distribution certificate
-        if: ${{ secrets.APPLE_CERTIFICATE != '' && secrets.APPLE_CERTIFICATE_PASSWORD != '' && secrets.KEYCHAIN_PASSWORD != '' }}
+        if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_CERTIFICATE_PASSWORD != '' && env.KEYCHAIN_PASSWORD != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
