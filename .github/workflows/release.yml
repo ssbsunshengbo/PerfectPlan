@@ -49,9 +49,9 @@ jobs:
     needs: verify-release
     runs-on: macos-latest
     env:
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      PERFECTPLAN_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      PERFECTPLAN_APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      PERFECTPLAN_KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -63,11 +63,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Import Apple distribution certificate
-        if: ${{ env.APPLE_CERTIFICATE != '' && env.APPLE_CERTIFICATE_PASSWORD != '' && env.KEYCHAIN_PASSWORD != '' }}
+        if: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE != '' && env.PERFECTPLAN_APPLE_CERTIFICATE_PASSWORD != '' && env.PERFECTPLAN_KEYCHAIN_PASSWORD != '' }}
         env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ env.PERFECTPLAN_KEYCHAIN_PASSWORD }}
         run: |
           echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
@@ -76,14 +76,31 @@ jobs:
           security set-keychain-settings -t 3600 -u build.keychain
           security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-      - name: Build and create draft release
+      - name: Build signed macOS draft release
+        if: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE != '' && env.PERFECTPLAN_APPLE_CERTIFICATE_PASSWORD != '' && env.PERFECTPLAN_KEYCHAIN_PASSWORD != '' }}
         uses: tauri-apps/tauri-action@v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ env.PERFECTPLAN_KEYCHAIN_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+        with:
+          tagName: ${{ inputs.tag }}
+          releaseName: PerfectPlan ${{ inputs.tag }}
+          releaseBody: See CHANGELOG.md for the release notes.
+          releaseCommitish: ${{ github.sha }}
+          releaseDraft: true
+          prerelease: ${{ inputs.prerelease }}
+          args: --bundles dmg
+      - name: Build unsigned macOS draft release
+        if: ${{ env.PERFECTPLAN_APPLE_CERTIFICATE == '' || env.PERFECTPLAN_APPLE_CERTIFICATE_PASSWORD == '' || env.PERFECTPLAN_KEYCHAIN_PASSWORD == '' }}
+        uses: tauri-apps/tauri-action@v0.6.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag }}
           releaseName: PerfectPlan ${{ inputs.tag }}
